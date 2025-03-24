@@ -20,15 +20,28 @@ func NewTokenType(name string, regex string) *TokenType {
 }
 
 var TokenTypeList = &map[string]TokenType{
-	"NUMBER":    *NewTokenType("NUMBER", `\d+`),
-	"VARIABLE":  *NewTokenType("VARIABLE", "[a-zA-Z]*"),
+	// Типы данных
+	"INT":  *NewTokenType("int", "int"),
+	"DOUB": *NewTokenType("double", "double"),
+	"VAR":  *NewTokenType("var", "var"),
+
+	// RegExp для типов данных
+	"VARIABLE": *NewTokenType("variable", "[a-zA-Z]*"),
+	"INTEGER":  *NewTokenType("INTEGER", `\d+`),
+	"DOUBLE":   *NewTokenType("DOUBLE", `\d+\.\d+`),
+	// Арифметические операции
+	"ASSIGN": *NewTokenType("ASSIGN", "="),
+	"MINUS":  *NewTokenType("MINUS", "-"),
+	"PLUS":   *NewTokenType("PLUS", "+"),
+	"LPAREN": *NewTokenType("LPAREN", "\\("),
+	"RPAREN": *NewTokenType("RPAREN", "\\)"),
+	// Логические операции
+	"EQUAL":    *NewTokenType("EQUAL", "equal"),
+	"NONEQUAL": *NewTokenType("NONEQUAL", "non-equal"),
+	"MORE":     *NewTokenType("MORE", "more"),
+	"LESS":     *NewTokenType("LESS", "less"),
+
 	"SEMICOLON": *NewTokenType("SEMICOLON", ";"),
 	"SPACE":     *NewTokenType("SPACE", "[ \\n\\t\\r]"),
-	"ASSIGN":    *NewTokenType("ASSIGN", "="),
 	"LOG":       *NewTokenType("LOG", "show"),
-	"MINUS":     *NewTokenType("MINUS", "-"),
-	"PLUS":      *NewTokenType("PLUS", "+"),
-	"LPAREN":    *NewTokenType("LPAREN", "\\("),
-	"RPAREN":    *NewTokenType("RPAREN", "\\)"),
-	"EQUAL":     *NewTokenType("EQUAL", "equal"),
 }

@@ -16,7 +16,6 @@ func NewLexer(code string) *Lexer {
 }
 
 func (l *Lexer) LexerAnalysis() *[]Token {
-	fmt.Println("Lexer Analysis")
 	for l.nextToken() {
 	}
 
@@ -45,7 +44,5 @@ func (l *Lexer) nextToken() bool {
 			return true
 		}
 	}
-
 	panic(fmt.Sprintf("Ошибка компиляции кода на позиции %d", l.pos))
-
 }
