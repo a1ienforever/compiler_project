@@ -6,8 +6,8 @@ import (
 )
 
 func main() {
-	lexerName := *lexer.NewLexer("var")
+	lexerName := *lexer.NewLexer("->")
 	lexerName.LexerAnalysis()
 
-	fmt.Print()
+	fmt.Print("End!")
 }
