@@ -8,7 +8,7 @@ import (
 type Lexer struct {
 	code   string
 	pos    int
-	tokens []Token
+	Tokens []Token
 }
 
 func NewLexer(code string) *Lexer {
@@ -17,33 +17,35 @@ func NewLexer(code string) *Lexer {
 
 func (l *Lexer) LexerAnalysis() *[]Token {
 	fmt.Println("Lexer Analysis")
-	fmt.Println(l.code)
 	for l.nextToken() {
-		fmt.Println(*TokenTypeList)
 	}
-	tokenList := *TokenTypeList
 
-	for i := 0; i < len(tokenList); i++ {
-
-	}
-	return &l.tokens
+	return &l.Tokens
 }
 
 func (l *Lexer) nextToken() bool {
 	if l.pos >= len(l.code) {
-
 		return false
 	}
 	tokenList := *TokenTypeList
 
 	for _, value := range tokenList {
-		regex, err := regexp.Compile(`^` + value.Regex)
-		if err == nil {
-			result := regex.MatchString(l.code[l.pos:])
-			fmt.Println(result, l.code, value)
+		regex, err := regexp.Compile("^" + value.Regex)
+		if err != nil {
+			panic(err)
+		}
+		str := l.code[l.pos:]
+		result := regex.FindString(str)
+		if result != "" {
+			token := NewToken(value, result, l.pos)
+			if token.TypeToken != tokenList["SPACE"] {
+				l.Tokens = append(l.Tokens, *token)
+			}
+			l.pos += len(result)
+			return true
 		}
 	}
 
-	return true
+	panic(fmt.Sprintf("Ошибка компиляции кода на позиции %d", l.pos))
 
 }
