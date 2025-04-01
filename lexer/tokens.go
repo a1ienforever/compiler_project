@@ -36,6 +36,7 @@ var TokenTypeList = &map[string]TokenType{
 	"LPAREN": *NewTokenType("LPAREN", "\\("),
 	"RPAREN": *NewTokenType("RPAREN", "\\)"),
 	// Логические операции
+	"IF":       *NewTokenType("IF", "if"),
 	"EQUAL":    *NewTokenType("EQUAL", "equal"),
 	"NONEQUAL": *NewTokenType("NONEQUAL", "non-equal"),
 	"MORE":     *NewTokenType("MORE", "more"),
