@@ -5,6 +5,6 @@ type StatementsNode struct {
 	codeStrings []ExpressionNode
 }
 
-func (s *StatementsNode) addNode(node ExpressionNode) {
+func (s *StatementsNode) AddNode(node ExpressionNode) {
 	s.codeStrings = append(s.codeStrings, node)
 }
