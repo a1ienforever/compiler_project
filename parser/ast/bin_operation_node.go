@@ -4,11 +4,11 @@ import "compiler_project/lexer"
 
 type BinOperationNode struct {
 	ExpressionNode
-	operator  lexer.Token
-	leftNode  ExpressionNode
-	rightNode ExpressionNode
+	Operator  lexer.Token
+	LeftNode  ExpressionNode
+	RightNode ExpressionNode
 }
 
 func NewBinOperationNode(operator lexer.Token, leftNode ExpressionNode, rightNode ExpressionNode) *BinOperationNode {
-	return &BinOperationNode{operator: operator, leftNode: leftNode, rightNode: rightNode}
+	return &BinOperationNode{Operator: operator, LeftNode: leftNode, RightNode: rightNode}
 }

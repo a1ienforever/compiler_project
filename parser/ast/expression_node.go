@@ -1,4 +1,4 @@
 package ast
 
-type ExpressionNode struct {
+type ExpressionNode interface {
 }
