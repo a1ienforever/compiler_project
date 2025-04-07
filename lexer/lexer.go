@@ -44,5 +44,5 @@ func (l *Lexer) nextToken() bool {
 			return true
 		}
 	}
-	panic(fmt.Sprintf("Ошибка компиляции кода на позиции %d", l.pos))
+	panic(fmt.Sprintf("Ошибка компиляции кода на позиции %d", l.pos)) // Пройтись дебагером
 }
