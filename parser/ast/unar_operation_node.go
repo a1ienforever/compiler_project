@@ -3,6 +3,7 @@ package ast
 import "compiler_project/lexer"
 
 type UnarOperationNode struct {
+	ExpressionNode
 	Operator lexer.Token
 	Operand  ExpressionNode
 }

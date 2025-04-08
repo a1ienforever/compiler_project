@@ -26,23 +26,23 @@ func (l *Lexer) nextToken() bool {
 	if l.pos >= len(l.code) {
 		return false
 	}
-	tokenList := *TokenTypeList
 
-	for _, value := range tokenList {
-		regex, err := regexp.Compile("^" + value.Regex)
+	for _, tokenType := range TokenTypesOrdered {
+		regex, err := regexp.Compile("^" + tokenType.Regex)
 		if err != nil {
 			panic(err)
 		}
 		str := l.code[l.pos:]
-		result := regex.FindString(str)
-		if result != "" {
-			token := NewToken(value, result, l.pos)
-			if token.TypeToken != tokenList["SPACE"] {
+		match := regex.FindString(str)
+		if match != "" {
+			token := NewToken(tokenType, match, l.pos)
+			if token.TypeToken.Name != "WHITESPACE" {
 				l.Tokens = append(l.Tokens, *token)
 			}
-			l.pos += len(result)
+			l.pos += len(match)
 			return true
 		}
 	}
+
 	panic(fmt.Sprintf("Ошибка компиляции кода на позиции %d", l.pos)) // Пройтись дебагером
 }

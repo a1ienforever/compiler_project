@@ -1,7 +1,7 @@
 package parser
 
 import (
-	lexer "compiler_project/lexer"
+	"compiler_project/lexer"
 	"compiler_project/parser/ast"
 	"fmt"
 	"log"
@@ -17,6 +17,8 @@ type Parser struct {
 func NewParser(tokens []lexer.Token) *Parser {
 	return &Parser{Tokens: tokens, Scope: make(map[string]any)}
 }
+
+// Match tries to match the current token with the expected types and advances the position.
 func (p *Parser) Match(expected ...lexer.TokenType) *lexer.Token {
 	if p.Pos < len(p.Tokens) {
 		currentToken := &p.Tokens[p.Pos]
@@ -30,6 +32,7 @@ func (p *Parser) Match(expected ...lexer.TokenType) *lexer.Token {
 	return nil
 }
 
+// Require ensures the next token matches one of the expected types, otherwise it panics.
 func (p *Parser) Require(expected ...lexer.TokenType) *lexer.Token {
 	token := p.Match(expected...)
 	if token == nil {
@@ -39,81 +42,95 @@ func (p *Parser) Require(expected ...lexer.TokenType) *lexer.Token {
 	return token
 }
 
+// parseVariableOrNumber parses either a number or a variable.
 func (p *Parser) parseVariableOrNumber() ast.ExpressionNode {
-	number := p.Match((*lexer.TokenTypeList)["NUMBER"])
+	tokenTypes := *lexer.TokenTypeList
+	number := p.Match(tokenTypes["INTEGER"])
 	if number != nil {
 		return ast.NewNumberNode(*number)
 	}
 
-	variable := p.Match((*lexer.TokenTypeList)["VARIABLE"])
+	variable := p.Match(tokenTypes["VARIABLE"])
 	if variable != nil {
 		return ast.NewVariableNode(*variable)
 	}
 	panic(fmt.Sprintf("Ожидается переменная или число на %d", p.Pos))
-	return nil
 }
 
+// parseParentheses parses expressions within parentheses.
 func (p *Parser) parseParentheses() ast.ExpressionNode {
-	if p.Match((*lexer.TokenTypeList)["LPAREN"]) != nil {
+	tokenTypes := *lexer.TokenTypeList
+	if p.Match(tokenTypes["LPAREN"]) != nil {
 		node := p.parseFormula()
-		p.Require((*lexer.TokenTypeList)["RPAREN"])
+		p.Require(tokenTypes["RPAREN"])
 		return node
 	}
 	return p.parseVariableOrNumber()
 }
 
+// parseFormula parses a formula, supporting binary operations like +, -, *, and /.
 func (p *Parser) parseFormula() ast.ExpressionNode {
+	tokenTypes := *lexer.TokenTypeList
 	leftNode := p.parseParentheses()
-	operator := p.Match((*lexer.TokenTypeList)["MINUS"], (*lexer.TokenTypeList)["PLUS"])
+
+	operator := p.Match(tokenTypes["MINUS"], tokenTypes["PLUS"], tokenTypes["MULTIPLY"], tokenTypes["DIVIDE"])
 
 	for operator != nil {
 		rightNode := p.parseParentheses()
 		leftNode = ast.NewBinOperationNode(*operator, leftNode, rightNode)
-		operator = p.Match((*lexer.TokenTypeList)["MINUS"], (*lexer.TokenTypeList)["PLUS"])
+		operator = p.Match(tokenTypes["MINUS"], tokenTypes["PLUS"], tokenTypes["MULTIPLY"], tokenTypes["DIVIDE"])
 	}
 
 	return leftNode
 }
 
+// ParseExpression handles the parsing of expressions, including assignments.
 func (p *Parser) ParseExpression() ast.ExpressionNode {
-	if p.Match((*lexer.TokenTypeList)["VARIABLE"]) == nil {
-		printNode := p.parsePrint()
-		return printNode
+	// Handle print operations (e.g. `show`)
+	tokenTypes := *lexer.TokenTypeList
+	if p.Match(tokenTypes["SHOW"]) != nil {
+		return p.parsePrint()
 	}
-	p.Pos--
+
 	variableNode := p.parseVariableOrNumber()
-	assignOperator := p.Match((*lexer.TokenTypeList)["ASSIGN"])
+	assignOperator := p.Match(tokenTypes["ASSIGN"])
+
 	if assignOperator != nil {
 		rightFormulNode := p.parseFormula()
 		binaryNode := ast.NewBinOperationNode(*assignOperator, variableNode, rightFormulNode)
 		return binaryNode
 	}
-	panic(fmt.Sprintf("После переменной ожидается оператор присвоения на позиции %d", p.Pos))
-	return nil
+
+	return variableNode
 }
 
+// ParseCode parses the entire program code consisting of multiple statements.
 func (p *Parser) ParseCode() *ast.StatementsNode {
 	root := new(ast.StatementsNode)
+	tokenTypes := *lexer.TokenTypeList
 	for p.Pos < len(p.Tokens) {
 		codeStringNode := p.ParseExpression()
-		token, _ := (*lexer.TokenTypeList)["SEMICOLON"]
-		p.Require(token)
+		p.Require(tokenTypes["SEMICOLON"])
 		root.AddNode(codeStringNode)
 	}
 	return root
 }
 
+// parsePrint parses print operations (e.g. `show <expression>`).
 func (p *Parser) parsePrint() ast.ExpressionNode {
-	token := p.Match((*lexer.TokenTypeList)["LOG"])
+	tokenTypes := *lexer.TokenTypeList
+	p.Pos--
+	token := p.Match(tokenTypes["SHOW"])
 	if token != nil {
 		return ast.NewUnarOperationNode(*token, p.parseFormula())
 	}
 	panic(fmt.Sprintf("Ожидается унарный оператор LOG на позиции %d", p.Pos))
 }
 
+// Run executes the parsed AST, calculating values for the expressions.
 func (p *Parser) Run(node ast.ExpressionNode) any {
+	tokenTypes := *lexer.TokenTypeList
 	switch n := node.(type) {
-
 	case *ast.NumberNode:
 		num, err := strconv.Atoi(n.Number.Text)
 		if err != nil {
@@ -123,31 +140,36 @@ func (p *Parser) Run(node ast.ExpressionNode) any {
 
 	case *ast.UnarOperationNode:
 		switch n.Operator.TypeToken.Name {
-		case (*lexer.TokenTypeList)["LOG"].Name:
+		case tokenTypes["SHOW"].Name:
 			fmt.Println(p.Run(n.Operand))
 			return nil
 		}
 
 	case *ast.BinOperationNode:
+		leftValue := p.Run(n.LeftNode)
+		rightValue := p.Run(n.RightNode)
+
 		switch n.Operator.TypeToken.Name {
-		case (*lexer.TokenTypeList)["PLUS"].Name:
-			return p.Run(n.LeftNode).(int) + p.Run(n.RightNode).(int)
-
-		case (*lexer.TokenTypeList)["MINUS"].Name:
-			return p.Run(n.LeftNode).(int) - p.Run(n.RightNode).(int)
-
-		case (*lexer.TokenTypeList)["ASSIGN"].Name:
-			result := p.Run(n.RightNode)
+		case tokenTypes["PLUS"].Name:
+			return leftValue.(int) + rightValue.(int)
+		case tokenTypes["MINUS"].Name:
+			return leftValue.(int) - rightValue.(int)
+		case tokenTypes["MULTIPLY"].Name:
+			return leftValue.(int) * rightValue.(int)
+		case tokenTypes["DIVIDE"].Name:
+			return leftValue.(int) / rightValue.(int)
+		case tokenTypes["ASSIGN"].Name:
 			if variable, ok := n.LeftNode.(*ast.VariableNode); ok {
-				p.Scope[variable.Variable.Text] = result
-				return result
-			} else {
-				panic("Левая часть ASSIGN — не VariableNode")
+				p.Scope[variable.Variable.Text] = rightValue
+				fmt.Printf("Добавлена переменная %s в Scope с значением %v\n", variable.Variable.Text, rightValue)
+				return rightValue
 			}
+			panic("Левая часть ASSIGN — не VariableNode")
 		}
 
 	case *ast.VariableNode:
 		val, ok := p.Scope[n.Variable.Text]
+
 		if !ok {
 			panic(fmt.Sprintf("Переменная '%s' не найдена", n.Variable.Text))
 		}
