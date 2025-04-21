@@ -24,12 +24,15 @@ var TokenTypeList = &map[string]TokenType{
 	"INT":  *NewTokenType("int", "int"),
 	"DOUB": *NewTokenType("double", "double"),
 	"VAR":  *NewTokenType("VAR", "var"),
+	"STR":  *NewTokenType("string", "string"),
 
 	// RegExp для типов данных
 	"SHOW":     *NewTokenType("SHOW", "show"),
 	"VARIABLE": *NewTokenType("VARIABLE", "[a-zA-Z_][a-zA-Z0-9_]*"),
 	"INTEGER":  *NewTokenType("INTEGER", `\d+`),
 	"DOUBLE":   *NewTokenType("DOUBLE", `\d+\.\d+`),
+	"STRING":   *NewTokenType("STRING", `'[^']*'`),
+
 	// Арифметические операции
 	"ASSIGN": *NewTokenType("ASSIGN", "="),
 	"MINUS":  *NewTokenType("MINUS", "-"),
@@ -50,10 +53,11 @@ var TokenTypeList = &map[string]TokenType{
 var TokenTypesOrdered = []TokenType{
 	// Ключевые слова
 	*NewTokenType("IF", "if"),
-	*NewTokenType("VAR", "var"),
+	//*NewTokenType("VAR", "var"),
 	*NewTokenType("INT", "int"),
 	*NewTokenType("DOUB", "double"),
 	*NewTokenType("SHOW", "show"),
+	*NewTokenType("STR", "string"),
 
 	// Логические операторы
 	*NewTokenType("EQUAL", "equal"),
@@ -62,9 +66,10 @@ var TokenTypesOrdered = []TokenType{
 	*NewTokenType("LESS", "less"),
 
 	// Литералы
-	*NewTokenType("DOUBLE", `\d+\.\d+`),
-	*NewTokenType("INTEGER", `\d+`),
 	*NewTokenType("VARIABLE", `[a-zA-Z_][a-zA-Z0-9_]*`), // важно ставить после ключевых слов
+	*NewTokenType("DOUBLE", `\d+\.\d+`),
+	*NewTokenType("STRING", "'[^']*'"),
+	*NewTokenType("INTEGER", `\d+`),
 
 	// Арифметические операторы
 	*NewTokenType("ASSIGN", "="),
