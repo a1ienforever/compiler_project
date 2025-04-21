@@ -7,7 +7,9 @@ import (
 )
 
 func main() {
-	code := "x = 12; show x;"
+	code := "x = 10;" +
+		"y = x + 5;" +
+		"show y;"
 
 	lexer := lexer.NewLexer(code)
 	tokens := lexer.LexerAnalysis()

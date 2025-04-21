@@ -146,6 +146,16 @@ func (p *Parser) Run(node ast.ExpressionNode) any {
 		}
 
 	case *ast.BinOperationNode:
+		// Сначала обрабатываем присваивание отдельно
+		if n.Operator.TypeToken.Name == tokenTypes["ASSIGN"].Name {
+			if variable, ok := n.LeftNode.(*ast.VariableNode); ok {
+				rightValue := p.Run(n.RightNode)
+				p.Scope[variable.Variable.Text] = rightValue
+				fmt.Printf("Добавлена переменная %s в Scope с значением %v\n", variable.Variable.Text, rightValue)
+				return rightValue
+			}
+			panic("Левая часть ASSIGN — не VariableNode")
+		}
 		leftValue := p.Run(n.LeftNode)
 		rightValue := p.Run(n.RightNode)
 
