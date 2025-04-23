@@ -24,7 +24,6 @@ func (p *Parser) Match(expected ...lexer.TokenType) *lexer.Token {
 	current := p.Tokens[p.Position]
 	for _, exp := range expected {
 		if current.TypeToken == exp {
-			fmt.Printf("Token: Type=%s, Text='%s' - Обработан!\n", current.TypeToken.Name, current.Text)
 			p.Position++
 			return &current
 		}
@@ -50,7 +49,6 @@ func (p *Parser) ParseCode() *ast.StatementsNode {
 		statements.AddNode(stmt)
 		p.Require(tokenTypes["SEMICOLON"]) // Добавляем каждое выражение в список
 	}
-	fmt.Println(p.Tokens)
 	return &statements
 }
 
