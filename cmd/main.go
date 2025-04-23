@@ -1,19 +1,35 @@
 package main
 
 import (
+	"bufio"
 	"compiler_project/lexer"
 	"compiler_project/parser"
 	"fmt"
+	"os"
 )
 
 func main() {
-	code := "int a = 10; int b = 1; show a; show b;"
+	//code := "double a = 10.5; show a;"
+	reader := bufio.NewReader(os.Stdin)
+	scope := map[string]interface{}{}
 
-	lexer := lexer.NewLexer(code)
-	lexer.LexerAnalysis()
-
-	parser := parser.NewParser(lexer.Tokens)
-	rootNode := parser.ParseCode()
-	fmt.Println(*rootNode)
-	parser.Run(rootNode)
+	for {
+		fmt.Print(">>> ")
+		text, _ := reader.ReadString('\n')
+		if text == "exit\n" {
+			break
+		}
+		l := lexer.NewLexer(text)
+		l.LexerAnalysis()
+		p := parser.NewParser(l.Tokens)
+		p.Scope = scope
+		rootNode := p.ParseCode()
+		p.Run(rootNode)
+		scope = p.Scope
+	}
+	//lexer := lexer.NewLexer(code)
+	//lexer.LexerAnalysis()
+	//
+	//rootNode := parser.ParseCode()
+	//parser.Run(rootNode)
 }

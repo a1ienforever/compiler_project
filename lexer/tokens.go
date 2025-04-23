@@ -74,7 +74,7 @@ var TokenTypesOrdered = []TokenType{
 	// Арифметические операторы
 	*NewTokenType("ASSIGN", "="),
 	*NewTokenType("PLUS", `\+`),
-	*NewTokenType("MINUS", `-`),
+	*NewTokenType("MINUS", "-"),
 
 	// Скобки и разделители
 	*NewTokenType("LPAREN", `\(`),

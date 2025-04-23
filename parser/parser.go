@@ -100,6 +100,21 @@ func (p *Parser) parseTypedAssignment() ast.ExpressionNode {
 }
 
 func (p *Parser) parseFormula() ast.ExpressionNode {
+	left := p.parsePrimary()
+
+	for {
+		op := p.Match((*lexer.TokenTypeList)["PLUS"], (*lexer.TokenTypeList)["MINUS"])
+		if op == nil {
+			break
+		}
+		right := p.parsePrimary()
+		left = ast.NewBinOperationNode(*op, left, right)
+	}
+
+	return left
+}
+
+func (p *Parser) parsePrimary() ast.ExpressionNode {
 	types := *lexer.TokenTypeList
 	if number := p.Match(types["INTEGER"]); number != nil {
 		return ast.NewNumberNode(*number)
@@ -113,10 +128,11 @@ func (p *Parser) parseFormula() ast.ExpressionNode {
 	if variable := p.Match(types["VARIABLE"]); variable != nil {
 		return ast.NewVariableNode(*variable)
 	}
-	return nil
+	panic("Ожидалось выражение")
 }
 
 func (p *Parser) Run(node ast.ExpressionNode) interface{} {
+	types := *lexer.TokenTypeList
 
 	switch n := node.(type) {
 	case *ast.NumberNode:
@@ -165,6 +181,51 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 		val := p.Run(n.Variable)
 		fmt.Printf(">> %v\n", val)
 		return val
+	case *ast.BinOperationNode:
+		left := p.Run(n.LeftNode)
+		right := p.Run(n.RightNode)
+
+		switch l := left.(type) {
+		case int:
+			r, ok := right.(int)
+			if !ok {
+				panic(fmt.Sprintf("Ожидался int справа, но получено %T", right))
+			}
+			switch n.Operator.TypeToken {
+			case types["PLUS"]:
+				return l + r
+			case types["MINUS"]:
+				return l - r
+			case types["MULTIPLY"]:
+				return l * r
+			}
+			panic("Незвестный оператор!")
+		case float64:
+			r, ok := right.(float64)
+			if !ok {
+				panic(fmt.Sprintf("Ожидался float64 справа, но получено %T", right))
+			}
+			switch n.Operator.TypeToken {
+			case types["PLUS"]:
+				return l + r
+			case types["MINUS"]:
+				return l - r
+			case types["MULTIPLY"]:
+				return l * r
+			}
+			panic("Незвестный оператор!")
+		case string:
+			r, ok := right.(string)
+			if !ok {
+				panic(fmt.Sprintf("Ожидался string справа, но получено %T", right))
+			}
+			if n.Operator.TypeToken == types["PLUS"] {
+				return l + r
+			}
+			panic("Операции над строками кроме + не поддерживаются")
+		default:
+			panic("Неподдерживаемые типы в бинарной операции")
+		}
 	default:
 		panic("Неизвестная нода")
 	}
