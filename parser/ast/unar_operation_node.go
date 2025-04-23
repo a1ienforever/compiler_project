@@ -3,11 +3,14 @@ package ast
 import "compiler_project/lexer"
 
 type UnarOperationNode struct {
-	ExpressionNode
 	Operator lexer.Token
 	Operand  ExpressionNode
 }
 
-func NewUnarOperationNode(operator lexer.Token, operand ExpressionNode) *UnarOperationNode {
-	return &UnarOperationNode{Operator: operator, Operand: operand}
+func NewUnarOperationNode(op lexer.Token, operand ExpressionNode) *UnarOperationNode {
+	return &UnarOperationNode{
+		Operator: op,
+		Operand:  operand,
+	}
 }
+func (*UnarOperationNode) isExpression() {}

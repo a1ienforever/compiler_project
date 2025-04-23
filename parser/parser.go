@@ -4,195 +4,168 @@ import (
 	"compiler_project/lexer"
 	"compiler_project/parser/ast"
 	"fmt"
-	"log"
 	"strconv"
 )
 
 type Parser struct {
-	Tokens []lexer.Token
-	Pos    int
-	Scope  map[string]any
+	Tokens   []lexer.Token
+	Position int
+	Scope    map[string]interface{}
 }
 
 func NewParser(tokens []lexer.Token) *Parser {
-	return &Parser{Tokens: tokens, Scope: make(map[string]any)}
+	return &Parser{Tokens: tokens, Scope: map[string]interface{}{}}
 }
 
 func (p *Parser) Match(expected ...lexer.TokenType) *lexer.Token {
-	if p.Pos < len(p.Tokens) {
-		currentToken := &p.Tokens[p.Pos]
-		for _, typ := range expected {
-			if typ.Name == currentToken.TypeToken.Name {
-				p.Pos++
-				return currentToken
-			}
+	if p.Position >= len(p.Tokens) {
+		return nil
+	}
+	current := p.Tokens[p.Position]
+	for _, exp := range expected {
+		if current.TypeToken == exp {
+			fmt.Printf("Token: Type=%s, Text='%s' - Обработан!\n", current.TypeToken.Name, current.Text)
+			p.Position++
+			return &current
 		}
 	}
 	return nil
 }
 
 func (p *Parser) Require(expected ...lexer.TokenType) *lexer.Token {
-	token := p.Match(expected...)
-	if token == nil {
-		log.Fatalf("Ошибка: на позиции %d ожидается %s", p.Pos, expected[0].Name)
+	tok := p.Match(expected...)
+	if tok == nil {
+		panic(fmt.Sprintf("Ожидался токен из множества: %v", expected))
 	}
-	return token
-}
-
-func (p *Parser) parseVariableOrNumber() ast.ExpressionNode {
-	tokenTypes := *lexer.TokenTypeList
-
-	if number := p.Match(tokenTypes["INTEGER"]); number != nil {
-		return ast.NewNumberNode(*number)
-	}
-
-	if str := p.Match(tokenTypes["STRING"]); str != nil {
-		return ast.NewStringNode(*str)
-	}
-
-	if variable := p.Match(tokenTypes["VARIABLE"]); variable != nil {
-		return ast.NewVariableNode(*variable)
-	}
-
-	panic(fmt.Sprintf("Ожидается переменная, строка или число на позиции %d", p.Pos))
-}
-
-func (p *Parser) parseParentheses() ast.ExpressionNode {
-	tokenTypes := *lexer.TokenTypeList
-	if p.Match(tokenTypes["LPAREN"]) != nil {
-		node := p.parseFormula()
-		p.Require(tokenTypes["RPAREN"])
-		return node
-	}
-	return p.parseVariableOrNumber()
-}
-
-func (p *Parser) parseFormula() ast.ExpressionNode {
-	tokenTypes := *lexer.TokenTypeList
-	leftNode := p.parseParentheses()
-
-	for {
-		operator := p.Match(tokenTypes["MINUS"], tokenTypes["PLUS"], tokenTypes["MULTIPLY"], tokenTypes["DIVIDE"])
-		if operator == nil {
-			break
-		}
-		rightNode := p.parseParentheses()
-		leftNode = ast.NewBinOperationNode(*operator, leftNode, rightNode)
-	}
-
-	return leftNode
-}
-
-func (p *Parser) ParseExpression() ast.ExpressionNode {
-	tokenTypes := *lexer.TokenTypeList
-	if p.Match(tokenTypes["SHOW"]) != nil {
-		return p.parsePrint()
-	}
-
-	variableNode := p.parseVariableOrNumber()
-	assignOperator := p.Match(tokenTypes["ASSIGN"])
-
-	if assignOperator != nil {
-		rightFormulNode := p.parseFormula()
-		return ast.NewBinOperationNode(*assignOperator, variableNode, rightFormulNode)
-	}
-
-	return variableNode
+	return tok
 }
 
 func (p *Parser) ParseCode() *ast.StatementsNode {
-	root := new(ast.StatementsNode)
+	var statements ast.StatementsNode
 	tokenTypes := *lexer.TokenTypeList
 
-	for p.Pos < len(p.Tokens) {
+	// Парсим выражения и добавляем их в statements
+	for p.Position < len(p.Tokens) {
+		stmt := p.ParseStatement()
+		statements.AddNode(stmt)
+		p.Require(tokenTypes["SEMICOLON"]) // Добавляем каждое выражение в список
+	}
+	fmt.Println(p.Tokens)
+	return &statements
+}
+
+func (p *Parser) ParseStatement() ast.ExpressionNode {
+	current := p.Tokens[p.Position]
+
+	switch current.TypeToken.Name {
+	case "int", "double", "string":
+		stmt := p.parseTypedAssignment()
+		return stmt
+	case "show":
+		return p.parseShowStatement()
+	default:
 		expr := p.ParseExpression()
-		p.Require(tokenTypes["SEMICOLON"])
-		root.AddNode(expr)
+		return expr
 	}
-
-	return root
 }
 
-func (p *Parser) parsePrint() ast.ExpressionNode {
+func (p *Parser) parseShowStatement() ast.ExpressionNode {
 	tokenTypes := *lexer.TokenTypeList
-	p.Pos--
-	token := p.Match(tokenTypes["SHOW"])
-	if token != nil {
-		return ast.NewUnarOperationNode(*token, p.parseFormula())
-	}
-	panic(fmt.Sprintf("Ожидается унарный оператор LOG на позиции %d", p.Pos))
+
+	p.Require(tokenTypes["SHOW"]) // "show"
+
+	var_name := p.Require(tokenTypes["VARIABLE"]) // имя переменной
+	variable := ast.NewVariableNode(*var_name)
+	return ast.NewShowNode(variable)
 }
-func (p *Parser) Run(node ast.ExpressionNode) any {
-	tokenTypes := *lexer.TokenTypeList
+
+func (p *Parser) ParseExpression() ast.ExpressionNode {
+
+	if node := p.parseTypedAssignment(); node != nil {
+		return node
+	}
+	return p.parseFormula()
+}
+
+func (p *Parser) parseTypedAssignment() ast.ExpressionNode {
+	types := *lexer.TokenTypeList
+	typeToken := p.Match(types["INT"], types["DOUB"], types["STR"])
+	if typeToken == nil {
+		return nil
+	}
+	variable := p.Require(types["VARIABLE"])
+	p.Require(types["ASSIGN"])
+	value := p.parseFormula()
+	return ast.NewTypedAssignNode(*typeToken, *variable, value)
+}
+
+func (p *Parser) parseFormula() ast.ExpressionNode {
+	types := *lexer.TokenTypeList
+	if number := p.Match(types["INTEGER"]); number != nil {
+		return ast.NewNumberNode(*number)
+	}
+	if flt := p.Match(types["DOUBLE"]); flt != nil {
+		return ast.NewFloatNode(*flt)
+	}
+	if str := p.Match(types["STRING"]); str != nil {
+		return ast.NewStringNode(*str)
+	}
+	if variable := p.Match(types["VARIABLE"]); variable != nil {
+		return ast.NewVariableNode(*variable)
+	}
+	return nil
+}
+
+func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 
 	switch n := node.(type) {
 	case *ast.NumberNode:
-		num, err := strconv.Atoi(n.Number.Text)
+		val, err := strconv.Atoi(n.Number.Text)
 		if err != nil {
-			panic(fmt.Sprintf("Невозможно преобразовать %s в число", n.Number.Text))
-		}
-		return num
-
-	case *ast.StringNode:
-		raw := n.String.Text
-		if len(raw) >= 2 && raw[0] == '\'' && raw[len(raw)-1] == '\'' {
-			return raw[1 : len(raw)-1]
-		}
-		return raw
-
-	case *ast.VariableNode:
-		val, ok := p.Scope[n.Variable.Text]
-		if !ok {
-			panic(fmt.Sprintf("Переменная '%s' не найдена", n.Variable.Text))
+			panic("Невозможно преобразовать int")
 		}
 		return val
-
-	case *ast.UnarOperationNode:
-		switch n.Operator.TypeToken.Name {
-		case tokenTypes["SHOW"].Name:
-			val := p.Run(n.Operand)
-			fmt.Println(val)
-			return nil
+	case *ast.FloatNode:
+		val, err := strconv.ParseFloat(n.Float.Text, 64)
+		if err != nil {
+			panic("Невозможно преобразовать float")
 		}
-
-	case *ast.BinOperationNode:
-		// Обработка присваивания
-		if n.Operator.TypeToken.Name == tokenTypes["ASSIGN"].Name {
-			if variable, ok := n.LeftNode.(*ast.VariableNode); ok {
-				value := p.Run(n.RightNode)
-				p.Scope[variable.Variable.Text] = value
-				fmt.Printf("Добавлена переменная %s в Scope со значением %v\n", variable.Variable.Text, value)
-				return value
+		return val
+	case *ast.StringNode:
+		return n.String.Text
+	case *ast.VariableNode:
+		return p.Scope[n.Variable.Text]
+	case *ast.TypedAssignNode:
+		val := p.Run(n.Value)
+		switch n.Type.Type {
+		case "int":
+			if _, ok := val.(int); !ok {
+				panic(fmt.Sprintf("Ожидался тип int, но получено %T", val))
 			}
-			panic("Левая часть ASSIGN — не переменная")
-		}
-
-		left := p.Run(n.LeftNode)
-		right := p.Run(n.RightNode)
-
-		switch n.Operator.TypeToken.Name {
-		case tokenTypes["PLUS"].Name:
-			switch lv := left.(type) {
-			case int:
-				return lv + right.(int)
-			case string:
-				return lv + right.(string)
-			default:
-				panic("Операция + доступна только для строк и чисел")
+		case "double":
+			if _, ok := val.(float64); !ok {
+				panic(fmt.Sprintf("Ожидался тип double, но получено %T", val))
 			}
-		case tokenTypes["MINUS"].Name:
-			return left.(int) - right.(int)
-		case tokenTypes["MULTIPLY"].Name:
-			return left.(int) * right.(int)
-		case tokenTypes["DIVIDE"].Name:
-			return left.(int) / right.(int)
+		case "string":
+			if _, ok := val.(string); !ok {
+				panic(fmt.Sprintf("Ожидался тип string, но получено %T", val))
+			}
 		}
+		p.Scope[n.Variable.Text] = val
+		fmt.Printf("Добавлена типизированная переменная %s типа %s со значением %v\n", n.Variable.Text, n.Type.Type, val)
+		return val
 	case *ast.StatementsNode:
+		var result interface{}
 		for _, stmt := range n.CodeStrings {
-			p.Run(stmt)
+			result = p.Run(stmt)
 		}
-		return nil
-	}
+		return result
 
-	panic("Ошибка! Неизвестный тип узла")
+	case *ast.ShowNode:
+		val := p.Run(n.Variable)
+		fmt.Printf(">> %v\n", val)
+		return val
+	default:
+		panic("Неизвестная нода")
+	}
 }

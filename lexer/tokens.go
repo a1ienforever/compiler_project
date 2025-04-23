@@ -27,7 +27,7 @@ var TokenTypeList = &map[string]TokenType{
 	"STR":  *NewTokenType("string", "string"),
 
 	// RegExp для типов данных
-	"SHOW":     *NewTokenType("SHOW", "show"),
+	"SHOW":     *NewTokenType("show", "show"),
 	"VARIABLE": *NewTokenType("VARIABLE", "[a-zA-Z_][a-zA-Z0-9_]*"),
 	"INTEGER":  *NewTokenType("INTEGER", `\d+`),
 	"DOUBLE":   *NewTokenType("DOUBLE", `\d+\.\d+`),
@@ -54,10 +54,10 @@ var TokenTypesOrdered = []TokenType{
 	// Ключевые слова
 	*NewTokenType("IF", "if"),
 	//*NewTokenType("VAR", "var"),
-	*NewTokenType("INT", "int"),
-	*NewTokenType("DOUB", "double"),
-	*NewTokenType("SHOW", "show"),
-	*NewTokenType("STR", "string"),
+	*NewTokenType("int", "int"),
+	*NewTokenType("double", "double"),
+	*NewTokenType("show", "show"),
+	*NewTokenType("string", "string"),
 
 	// Логические операторы
 	*NewTokenType("EQUAL", "equal"),

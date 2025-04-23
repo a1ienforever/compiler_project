@@ -7,15 +7,13 @@ import (
 )
 
 func main() {
-	code := "a = 'Hello, ';\n b = 'world!';\n c = a + b;\nshow c;\n"
+	code := "int a = 10; int b = 1; show a; show b;"
 
 	lexer := lexer.NewLexer(code)
-	tokens := lexer.LexerAnalysis()
+	lexer.LexerAnalysis()
 
-	for _, token := range *tokens {
-		fmt.Printf("Token: Type=%s, Text= '%s', Pos=%d\n", token.TypeToken.Name, token.Text, token.Pos)
-	}
 	parser := parser.NewParser(lexer.Tokens)
 	rootNode := parser.ParseCode()
+	fmt.Println(*rootNode)
 	parser.Run(rootNode)
 }
