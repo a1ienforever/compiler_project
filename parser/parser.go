@@ -361,6 +361,10 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 				return l * r
 			case types["DIVIDE"]:
 				return l / r
+			case types["EQUAL"]:
+				return l == r
+			case types["NONEQUAL"]:
+				return l != r
 			}
 			panic("Незвестный оператор!")
 		case float64:
