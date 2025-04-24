@@ -37,15 +37,19 @@ func (tc *TypeChecker) Check(node ast.ExpressionNode) (string, error) {
 		return t, nil
 
 	case *ast.TypedAssignNode:
+		declaredType := normalizeTypeName(n.Type.Type)
+		// Временно запоминаем тип переменной, чтобы она была видна внутри Check(n.Value)
+		tc.Scope[n.Variable.Text] = declaredType
+
 		valType, err := tc.Check(n.Value)
 		if err != nil {
 			return "", err
 		}
-		declaredType := normalizeTypeName(n.Type.Type)
+
 		if valType != declaredType {
 			return "", fmt.Errorf("тип переменной %s задан как %s, но присваивается %s", n.Variable.Text, declaredType, valType)
 		}
-		tc.Scope[n.Variable.Text] = declaredType
+
 		return declaredType, nil
 
 	case *ast.StatementsNode:
@@ -100,6 +104,11 @@ func (tc *TypeChecker) Check(node ast.ExpressionNode) (string, error) {
 				return "", fmt.Errorf("логическая операция %s требует типов boolean", n.Operator.TypeToken)
 			}
 			return "boolean", nil
+		case types["PLUS"], types["MINUS"], types["MULTIPLY"], types["DIVIDE"]:
+			if (leftType == "int" || leftType == "double") && leftType == rightType {
+				return leftType, nil
+			}
+			return "", fmt.Errorf("арифметическая операция %s требует совпадающих числовых типов, получено: %s и %s", n.Operator.TypeToken, leftType, rightType)
 
 		default:
 			return "", fmt.Errorf("неподдерживаемая операция %s для типов %s и %s", n.Operator.TypeToken, leftType, rightType)
