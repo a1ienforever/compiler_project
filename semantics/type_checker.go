@@ -1,6 +1,7 @@
 package semantics
 
 import (
+	"compiler_project/lexer"
 	"compiler_project/parser/ast"
 	"fmt"
 )
@@ -55,7 +56,54 @@ func (tc *TypeChecker) Check(node ast.ExpressionNode) (string, error) {
 			}
 		}
 		return "void", nil
+	case *ast.BinOperationNode:
+		types := *lexer.TokenTypeList
 
+		leftType, err := tc.Check(n.LeftNode)
+		if err != nil {
+			return "", err
+		}
+		rightType, err := tc.Check(n.RightNode)
+		if err != nil {
+			return "", err
+		}
+
+		// Проводим проверку типов для операций EQUAL и NONEQUAL
+		switch n.Operator.TypeToken {
+		case types["EQUAL"], types["NONEQUAL"]:
+			// Проверка на типы, которые поддерживают операцию сравнения
+			if leftType != rightType {
+				return "", fmt.Errorf("недопустимое сравнение типов: %s и %s", leftType, rightType)
+			}
+			// Можно добавить дополнительные проверки для типов, если они должны быть ограничены
+			switch leftType {
+			case "int", "double", "string", "boolean":
+				// Поддерживаем сравнение для этих типов
+				return "boolean", nil
+			default:
+				return "", fmt.Errorf("операция %s не поддерживается для типа %s", n.Operator.TypeToken, leftType)
+			}
+
+		// Поддержка других типов бинарных операций, например, для чисел
+		case types["GREATER"], types["LESS"]:
+			if leftType != rightType {
+				return "", fmt.Errorf("недопустимое сравнение типов: %s и %s", leftType, rightType)
+			}
+			if leftType == "boolean" {
+				return "", fmt.Errorf("операция %s не поддерживается для типа boolean", n.Operator.TypeToken)
+			}
+			return "boolean", nil
+
+		// Остальные бинарные операции, например, AND, OR, которые могут быть логическими
+		case types["AND"], types["OR"]:
+			if leftType != "boolean" || rightType != "boolean" {
+				return "", fmt.Errorf("логическая операция %s требует типов boolean", n.Operator.TypeToken)
+			}
+			return "boolean", nil
+
+		default:
+			return "", fmt.Errorf("неподдерживаемая операция %s для типов %s и %s", n.Operator.TypeToken, leftType, rightType)
+		}
 	case *ast.IfNode:
 		condType, err := tc.Check(n.Condition)
 		if err != nil {
