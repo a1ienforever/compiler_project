@@ -227,7 +227,6 @@ func (p *Parser) parsePrimary() ast.ExpressionNode {
 	if variable := p.Match(types["VARIABLE"]); variable != nil {
 		return ast.NewVariableNode(*variable)
 	}
-	fmt.Printf("parsePrimary: неожиданный токен %v\n", p.Position)
 	panic("Ожидалось выражение")
 }
 

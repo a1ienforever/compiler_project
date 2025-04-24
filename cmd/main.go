@@ -4,14 +4,15 @@ import (
 	"bufio"
 	"compiler_project/lexer"
 	"compiler_project/parser"
+	"compiler_project/semantics"
 	"fmt"
 	"os"
 )
 
 func main() {
-	//code := "double a = 10.5; show a;"
 	reader := bufio.NewReader(os.Stdin)
 	scope := map[string]interface{}{}
+	checker := semantics.NewTypeChecker()
 
 	for {
 		fmt.Print(">>> ")
@@ -25,12 +26,12 @@ func main() {
 		p := parser.NewParser(l.Tokens)
 		p.Scope = scope
 		rootNode := p.ParseCode()
+		_, err := checker.Check(rootNode)
+		if err != nil {
+			fmt.Printf("Ошибка семантики: %v\n", err)
+			continue
+		}
 		p.Run(rootNode)
 		scope = p.Scope
 	}
-	//lexer := lexer.NewLexer(code)
-	//lexer.LexerAnalysis()
-	//
-	//rootNode := parser.ParseCode()
-	//parser.Run(rootNode)
 }
