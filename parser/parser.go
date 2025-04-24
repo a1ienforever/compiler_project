@@ -63,6 +63,8 @@ func (p *Parser) ParseStatement() ast.ExpressionNode {
 		return p.parseShowStatement()
 	case "if":
 		return p.parseIfStatement()
+	case "while":
+		return p.parseWhileStatement()
 	default:
 		expr := p.ParseExpression()
 		return expr
@@ -230,6 +232,30 @@ func (p *Parser) parsePrimary() ast.ExpressionNode {
 	panic("Ожидалось выражение")
 }
 
+func (p *Parser) parseWhileStatement() ast.ExpressionNode {
+	types := *lexer.TokenTypeList
+
+	// Ожидаем while
+	p.Require(types["WHILE"])
+
+	// Условие
+	condition := p.ParseExpression()
+
+	// Ожидаем {
+	p.Require(types["LBRACE"])
+
+	// Блок команд внутри цикла
+	body := &ast.StatementsNode{}
+	for p.Match(types["RBRACE"]) == nil { // }
+		stmt := p.ParseStatement()
+		body.AddNode(stmt)
+		p.Require(types["SEMICOLON"])
+	}
+
+	// Создаём и возвращаем узел while
+	return ast.NewWhileNode(condition, body)
+}
+
 func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 	types := *lexer.TokenTypeList
 
@@ -300,6 +326,22 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 			return p.Run(n.FalseBranch)
 		}
 		return nil
+	case *ast.WhileNode:
+		cond := p.Run(n.Condition)
+		condVal, ok := cond.(bool)
+		if !ok {
+			panic("Условие в while должно быть boolean")
+		}
+		for condVal {
+			p.Run(n.Body)
+			cond = p.Run(n.Condition)
+			condVal, ok = cond.(bool)
+			if !ok {
+				panic("Условие в while должно быть boolean")
+			}
+		}
+		return nil
+
 	case *ast.BinOperationNode:
 		left := p.Run(n.LeftNode)
 		right := p.Run(n.RightNode)

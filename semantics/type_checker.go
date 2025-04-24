@@ -75,6 +75,22 @@ func (tc *TypeChecker) Check(node ast.ExpressionNode) (string, error) {
 			}
 		}
 		return "void", nil
+	case *ast.WhileNode:
+		// Проверка типа условия в цикле while
+		condType, err := tc.Check(n.Condition)
+		if err != nil {
+			return "", err
+		}
+		if condType != "boolean" {
+			return "", fmt.Errorf("условие в while должно быть boolean, получено: %s", condType)
+		}
+
+		// Проверка тела цикла
+		_, err = tc.Check(n.Body)
+		if err != nil {
+			return "", err
+		}
+		return "void", nil
 
 	case *ast.ShowNode:
 		_, err := tc.Check(n.Variable)

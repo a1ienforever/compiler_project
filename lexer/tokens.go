@@ -50,6 +50,7 @@ var TokenTypeList = &map[string]TokenType{
 	"IF":       *NewTokenType("if", "if"),
 	"ELSE":     *NewTokenType("else", "else"),
 	"EQUAL":    *NewTokenType("EQUAL", "equal"),
+	"WHILE":    *NewTokenType("while", "while"),
 	"NONEQUAL": *NewTokenType("NONEQUAL", "non-equal"),
 	"MORE":     *NewTokenType("MORE", "more"),
 	"LESS":     *NewTokenType("LESS", "less"),
@@ -64,6 +65,7 @@ var TokenTypesOrdered = []TokenType{
 	// Ключевые слова
 	*NewTokenType("if", "if"),
 	*NewTokenType("else", "else"),
+	*NewTokenType("while", "while"),
 	//*NewTokenType("VAR", "var"),
 	*NewTokenType("int", "int"),
 	*NewTokenType("double", "double"),
