@@ -21,10 +21,13 @@ func NewTokenType(name string, regex string) *TokenType {
 
 var TokenTypeList = &map[string]TokenType{
 	// Типы данных
-	"INT":  *NewTokenType("int", "int"),
-	"DOUB": *NewTokenType("double", "double"),
-	"VAR":  *NewTokenType("VAR", "var"),
-	"STR":  *NewTokenType("string", "string"),
+	"INT":     *NewTokenType("int", "int"),
+	"DOUB":    *NewTokenType("double", "double"),
+	"VAR":     *NewTokenType("VAR", "var"),
+	"STR":     *NewTokenType("string", "string"),
+	"BOOLEAN": *NewTokenType("boolean", "boolean"),
+	"TRUE":    *NewTokenType("TRUE", "true"),
+	"FALSE":   *NewTokenType("FALSE", "false"),
 
 	// RegExp для типов данных
 	"SHOW":     *NewTokenType("show", "show"),
@@ -41,12 +44,17 @@ var TokenTypeList = &map[string]TokenType{
 	"DIVIDE":   *NewTokenType("DIVIDE", "/"),
 	"LPAREN":   *NewTokenType("LPAREN", "\\("),
 	"RPAREN":   *NewTokenType("RPAREN", "\\)"),
+	"LBRACE":   *NewTokenType("LBRACE", "{"),
+	"RBRACE":   *NewTokenType("RBRACE", "}"),
 	// Логические операции
-	"IF":       *NewTokenType("IF", "if"),
+	"IF":       *NewTokenType("if", "if"),
+	"ELSE":     *NewTokenType("else", "else"),
 	"EQUAL":    *NewTokenType("EQUAL", "equal"),
 	"NONEQUAL": *NewTokenType("NONEQUAL", "non-equal"),
 	"MORE":     *NewTokenType("MORE", "more"),
 	"LESS":     *NewTokenType("LESS", "less"),
+	"AND":      *NewTokenType("AND", "and"),
+	"OR":       *NewTokenType("OR", "or"),
 
 	"SEMICOLON":  *NewTokenType("SEMICOLON", ";"),
 	"WHITESPACE": *NewTokenType("WHITESPACE", "[ \n\t\r]+"),
@@ -54,18 +62,24 @@ var TokenTypeList = &map[string]TokenType{
 
 var TokenTypesOrdered = []TokenType{
 	// Ключевые слова
-	*NewTokenType("IF", "if"),
+	*NewTokenType("if", "if"),
+	*NewTokenType("else", "else"),
 	//*NewTokenType("VAR", "var"),
 	*NewTokenType("int", "int"),
 	*NewTokenType("double", "double"),
 	*NewTokenType("show", "show"),
 	*NewTokenType("string", "string"),
+	*NewTokenType("boolean", "boolean"),
+	*NewTokenType("TRUE", "true"),
+	*NewTokenType("FALSE", "false"),
 
 	// Логические операторы
 	*NewTokenType("EQUAL", "equal"),
 	*NewTokenType("NONEQUAL", "non-equal"),
 	*NewTokenType("MORE", "more"),
 	*NewTokenType("LESS", "less"),
+	*NewTokenType("AND", "and"),
+	*NewTokenType("OR", "or"),
 
 	// Литералы
 	*NewTokenType("VARIABLE", `[a-zA-Z_][a-zA-Z0-9_]*`), // важно ставить после ключевых слов
@@ -83,6 +97,8 @@ var TokenTypesOrdered = []TokenType{
 	// Скобки и разделители
 	*NewTokenType("LPAREN", `\(`),
 	*NewTokenType("RPAREN", `\)`),
+	*NewTokenType("LBRACE", "{"),
+	*NewTokenType("RBRACE", "}"),
 	*NewTokenType("SEMICOLON", ";"),
 
 	// Пробелы (последним, чтобы можно было игнорировать)

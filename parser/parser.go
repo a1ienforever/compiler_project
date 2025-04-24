@@ -61,10 +61,42 @@ func (p *Parser) ParseStatement() ast.ExpressionNode {
 		return stmt
 	case "show":
 		return p.parseShowStatement()
+	case "if":
+		return p.parseIfStatement()
 	default:
 		expr := p.ParseExpression()
 		return expr
 	}
+}
+
+func (p *Parser) parseIfStatement() ast.ExpressionNode {
+	types := *lexer.TokenTypeList
+
+	p.Require(types["IF"])
+
+	condition := p.ParseExpression()
+	p.Require(types["LBRACE"]) // {
+
+	trueBranch := &ast.StatementsNode{}
+	for p.Match(types["RBRACE"]) == nil { // }
+		stmt := p.ParseStatement()
+		trueBranch.AddNode(stmt)
+		p.Require(types["SEMICOLON"])
+	}
+
+	var falseBranch *ast.StatementsNode
+	if p.Match(types["ELSE"]) != nil {
+		p.Require(types["LBRACE"]) // {
+
+		falseBranch = &ast.StatementsNode{}
+		for p.Match(types["RBRACE"]) == nil { // }
+			stmt := p.ParseStatement()
+			falseBranch.AddNode(stmt)
+			p.Require(types["SEMICOLON"])
+		}
+	}
+
+	return ast.NewIfNode(condition, trueBranch, falseBranch)
 }
 
 func (p *Parser) parseShowStatement() ast.ExpressionNode {
@@ -87,7 +119,7 @@ func (p *Parser) ParseExpression() ast.ExpressionNode {
 
 func (p *Parser) parseTypedAssignment() ast.ExpressionNode {
 	types := *lexer.TokenTypeList
-	typeToken := p.Match(types["INT"], types["DOUB"], types["STR"])
+	typeToken := p.Match(types["INT"], types["DOUB"], types["STR"], types["BOOLEAN"])
 	if typeToken == nil {
 		return nil
 	}
@@ -98,11 +130,42 @@ func (p *Parser) parseTypedAssignment() ast.ExpressionNode {
 }
 
 func (p *Parser) parseFormula() ast.ExpressionNode {
+	return p.parseLogicalOr()
+}
+
+func (p *Parser) parseLogicalOr() ast.ExpressionNode {
+	node := p.parseLogicalAnd()
+	types := *lexer.TokenTypeList
+	for {
+		op := p.Match(types["OR"])
+		if op == nil {
+			break
+		}
+		right := p.parseLogicalAnd()
+		node = ast.NewBinOperationNode(*op, node, right)
+	}
+	return node
+}
+
+func (p *Parser) parseLogicalAnd() ast.ExpressionNode {
+	node := p.parseEquality()
+	types := *lexer.TokenTypeList
+	for {
+		op := p.Match(types["AND"])
+		if op == nil {
+			break
+		}
+		right := p.parseEquality()
+		node = ast.NewBinOperationNode(*op, node, right)
+	}
+	return node
+}
+
+func (p *Parser) parseEquality() ast.ExpressionNode {
 	node := p.parseTerm()
 	types := *lexer.TokenTypeList
-
 	for {
-		op := p.Match(types["PLUS"], types["MINUS"])
+		op := p.Match(types["EQUAL"], types["NONEQUAL"])
 		if op == nil {
 			break
 		}
@@ -113,9 +176,22 @@ func (p *Parser) parseFormula() ast.ExpressionNode {
 }
 
 func (p *Parser) parseTerm() ast.ExpressionNode {
+	node := p.parseFactor()
+	types := *lexer.TokenTypeList
+	for {
+		op := p.Match(types["PLUS"], types["MINUS"])
+		if op == nil {
+			break
+		}
+		right := p.parseFactor()
+		node = ast.NewBinOperationNode(*op, node, right)
+	}
+	return node
+}
+
+func (p *Parser) parseFactor() ast.ExpressionNode {
 	node := p.parsePrimary()
 	types := *lexer.TokenTypeList
-
 	for {
 		op := p.Match(types["MULTIPLY"], types["DIVIDE"])
 		if op == nil {
@@ -136,6 +212,9 @@ func (p *Parser) parsePrimary() ast.ExpressionNode {
 		return expr
 	}
 
+	if b := p.Match(types["TRUE"], types["FALSE"]); b != nil {
+		return ast.NewBooleanNode(*b)
+	}
 	if number := p.Match(types["INTEGER"]); number != nil {
 		return ast.NewNumberNode(*number)
 	}
@@ -148,7 +227,7 @@ func (p *Parser) parsePrimary() ast.ExpressionNode {
 	if variable := p.Match(types["VARIABLE"]); variable != nil {
 		return ast.NewVariableNode(*variable)
 	}
-
+	fmt.Printf("parsePrimary: неожиданный токен %v\n", p.Position)
 	panic("Ожидалось выражение")
 }
 
@@ -170,6 +249,8 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 		return val
 	case *ast.StringNode:
 		return n.String.Text
+	case *ast.BooleanNode:
+		return n.Boolean.TypeToken.Name == "TRUE"
 	case *ast.VariableNode:
 		return p.Scope[n.Variable.Text]
 	case *ast.TypedAssignNode:
@@ -187,6 +268,11 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 			if _, ok := val.(string); !ok {
 				panic(fmt.Sprintf("Ожидался тип string, но получено %T", val))
 			}
+		case "boolean":
+			if _, ok := val.(bool); !ok {
+				panic(fmt.Sprintf("Ожидался тип boolean, но получено %T", val))
+			}
+
 		}
 		p.Scope[n.Variable.Text] = val
 		fmt.Printf("Добавлена типизированная переменная %s типа %s со значением %v\n", n.Variable.Text, n.Type.Type, val)
@@ -202,6 +288,19 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 		val := p.Run(n.Variable)
 		fmt.Printf(">> %v\n", val)
 		return val
+	case *ast.IfNode:
+		cond := p.Run(n.Condition)
+		condVal, ok := cond.(bool)
+		if !ok {
+			panic("Условие в if должно быть boolean")
+		}
+		if condVal {
+			return p.Run(n.TrueBranch)
+		}
+		if n.FalseBranch != nil {
+			return p.Run(n.FalseBranch)
+		}
+		return nil
 	case *ast.BinOperationNode:
 		left := p.Run(n.LeftNode)
 		right := p.Run(n.RightNode)
@@ -248,6 +347,23 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 				return l + r
 			}
 			panic("Операции над строками кроме + не поддерживаются")
+		case bool:
+			r, ok := right.(bool)
+			if !ok {
+				panic(fmt.Sprintf("Ожидался boolean справа, но получено %T", right))
+			}
+			switch n.Operator.TypeToken {
+			case types["EQUAL"]:
+				return l == r
+			case types["NONEQUAL"]:
+				return l != r
+			case types["AND"]:
+				return l && r
+			case types["OR"]:
+				return l || r
+			default:
+				panic("Неподдерживаемая логическая операция")
+			}
 		default:
 			panic("Неподдерживаемые типы в бинарной операции")
 		}
