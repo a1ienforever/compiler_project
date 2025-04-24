@@ -21,6 +21,7 @@ func main() {
 		}
 		l := lexer.NewLexer(text)
 		l.LexerAnalysis()
+		fmt.Println(l.Tokens)
 		p := parser.NewParser(l.Tokens)
 		p.Scope = scope
 		rootNode := p.ParseCode()

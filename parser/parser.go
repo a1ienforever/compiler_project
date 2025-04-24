@@ -99,9 +99,9 @@ func (p *Parser) parseTypedAssignment() ast.ExpressionNode {
 
 func (p *Parser) parseFormula() ast.ExpressionNode {
 	left := p.parsePrimary()
-
+	types := *lexer.TokenTypeList
 	for {
-		op := p.Match((*lexer.TokenTypeList)["PLUS"], (*lexer.TokenTypeList)["MINUS"])
+		op := p.Match(types["PLUS"], types["MINUS"], types["MULTIPLY"], types["DIVIDE"])
 		if op == nil {
 			break
 		}
@@ -196,6 +196,8 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 				return l - r
 			case types["MULTIPLY"]:
 				return l * r
+			case types["DIVIDE"]:
+				return l / r
 			}
 			panic("Незвестный оператор!")
 		case float64:
@@ -210,6 +212,8 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 				return l - r
 			case types["MULTIPLY"]:
 				return l * r
+			case types["DIVIDE"]:
+				return l / r
 			}
 			panic("Незвестный оператор!")
 		case string:

@@ -34,11 +34,13 @@ var TokenTypeList = &map[string]TokenType{
 	"STRING":   *NewTokenType("STRING", `'[^']*'`),
 
 	// Арифметические операции
-	"ASSIGN": *NewTokenType("ASSIGN", "="),
-	"MINUS":  *NewTokenType("MINUS", "-"),
-	"PLUS":   *NewTokenType("PLUS", "\\+"),
-	"LPAREN": *NewTokenType("LPAREN", "\\("),
-	"RPAREN": *NewTokenType("RPAREN", "\\)"),
+	"ASSIGN":   *NewTokenType("ASSIGN", "="),
+	"MINUS":    *NewTokenType("MINUS", "-"),
+	"PLUS":     *NewTokenType("PLUS", "\\+"),
+	"MULTIPLY": *NewTokenType("MULTIPLY", "\\*"),
+	"DIVIDE":   *NewTokenType("DIVIDE", "/"),
+	"LPAREN":   *NewTokenType("LPAREN", "\\("),
+	"RPAREN":   *NewTokenType("RPAREN", "\\)"),
 	// Логические операции
 	"IF":       *NewTokenType("IF", "if"),
 	"EQUAL":    *NewTokenType("EQUAL", "equal"),
@@ -75,6 +77,8 @@ var TokenTypesOrdered = []TokenType{
 	*NewTokenType("ASSIGN", "="),
 	*NewTokenType("PLUS", `\+`),
 	*NewTokenType("MINUS", "-"),
+	*NewTokenType("MULTIPLY", "\\*"),
+	*NewTokenType("DIVIDE", "/"),
 
 	// Скобки и разделители
 	*NewTokenType("LPAREN", `\(`),
