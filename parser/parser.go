@@ -98,22 +98,44 @@ func (p *Parser) parseTypedAssignment() ast.ExpressionNode {
 }
 
 func (p *Parser) parseFormula() ast.ExpressionNode {
-	left := p.parsePrimary()
+	node := p.parseTerm()
 	types := *lexer.TokenTypeList
+
 	for {
-		op := p.Match(types["PLUS"], types["MINUS"], types["MULTIPLY"], types["DIVIDE"])
+		op := p.Match(types["PLUS"], types["MINUS"])
+		if op == nil {
+			break
+		}
+		right := p.parseTerm()
+		node = ast.NewBinOperationNode(*op, node, right)
+	}
+	return node
+}
+
+func (p *Parser) parseTerm() ast.ExpressionNode {
+	node := p.parsePrimary()
+	types := *lexer.TokenTypeList
+
+	for {
+		op := p.Match(types["MULTIPLY"], types["DIVIDE"])
 		if op == nil {
 			break
 		}
 		right := p.parsePrimary()
-		left = ast.NewBinOperationNode(*op, left, right)
+		node = ast.NewBinOperationNode(*op, node, right)
 	}
-
-	return left
+	return node
 }
 
 func (p *Parser) parsePrimary() ast.ExpressionNode {
 	types := *lexer.TokenTypeList
+
+	if p.Match(types["LPAREN"]) != nil { // обрабатываем (
+		expr := p.parseFormula()   // рекурсивно разбираем вложенное выражение
+		p.Require(types["RPAREN"]) // обрабатываем )
+		return expr
+	}
+
 	if number := p.Match(types["INTEGER"]); number != nil {
 		return ast.NewNumberNode(*number)
 	}
@@ -126,6 +148,7 @@ func (p *Parser) parsePrimary() ast.ExpressionNode {
 	if variable := p.Match(types["VARIABLE"]); variable != nil {
 		return ast.NewVariableNode(*variable)
 	}
+
 	panic("Ожидалось выражение")
 }
 
