@@ -5,6 +5,7 @@ import (
 	"compiler_project/lexer"
 	"compiler_project/parser"
 	"compiler_project/semantics"
+	"compiler_project/tac"
 	"fmt"
 	"os"
 )
@@ -22,7 +23,6 @@ func main() {
 		}
 		l := lexer.NewLexer(text)
 		l.LexerAnalysis()
-		fmt.Println(l.Tokens)
 		p := parser.NewParser(l.Tokens)
 		p.Scope = scope
 		rootNode := p.ParseCode()
@@ -33,5 +33,10 @@ func main() {
 		}
 		p.Run(rootNode)
 		scope = p.Scope
+
+		builder := tac.NewTACBuilder()
+		builder.Generate(rootNode)
+		fmt.Println("=== Трёхадресный код ===")
+		builder.Print()
 	}
 }
