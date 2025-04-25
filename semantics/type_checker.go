@@ -89,7 +89,7 @@ func (tc *TypeChecker) Check(node ast.ExpressionNode) (string, error) {
 			}
 
 		// Поддержка других типов бинарных операций, например, для чисел
-		case types["GREATER"], types["LESS"]:
+		case types["MORE"], types["LESS"]:
 			if leftType != rightType {
 				return "", fmt.Errorf("недопустимое сравнение типов: %s и %s", leftType, rightType)
 			}
@@ -104,6 +104,7 @@ func (tc *TypeChecker) Check(node ast.ExpressionNode) (string, error) {
 				return "", fmt.Errorf("логическая операция %s требует типов boolean", n.Operator.TypeToken)
 			}
 			return "boolean", nil
+
 		case types["PLUS"], types["MINUS"], types["MULTIPLY"], types["DIVIDE"]:
 			if (leftType == "int" || leftType == "double") && leftType == rightType {
 				return leftType, nil

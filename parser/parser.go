@@ -104,7 +104,7 @@ func (p *Parser) parseIfStatement() ast.ExpressionNode {
 func (p *Parser) parseShowStatement() ast.ExpressionNode {
 	tokenTypes := *lexer.TokenTypeList
 
-	p.Require(tokenTypes["SHOW"]) // "show"
+	p.Require(tokenTypes["SHOW"])
 
 	var_name := p.Require(tokenTypes["VARIABLE"]) // имя переменной
 	variable := ast.NewVariableNode(*var_name)
@@ -167,7 +167,7 @@ func (p *Parser) parseEquality() ast.ExpressionNode {
 	node := p.parseTerm()
 	types := *lexer.TokenTypeList
 	for {
-		op := p.Match(types["EQUAL"], types["NONEQUAL"])
+		op := p.Match(types["EQUAL"], types["NONEQUAL"], types["MORE"], types["LESS"])
 		if op == nil {
 			break
 		}
@@ -208,9 +208,9 @@ func (p *Parser) parseFactor() ast.ExpressionNode {
 func (p *Parser) parsePrimary() ast.ExpressionNode {
 	types := *lexer.TokenTypeList
 
-	if p.Match(types["LPAREN"]) != nil { // обрабатываем (
-		expr := p.parseFormula()   // рекурсивно разбираем вложенное выражение
-		p.Require(types["RPAREN"]) // обрабатываем )
+	if p.Match(types["LPAREN"]) != nil {
+		expr := p.parseFormula()
+		p.Require(types["RPAREN"])
 		return expr
 	}
 
@@ -235,16 +235,12 @@ func (p *Parser) parsePrimary() ast.ExpressionNode {
 func (p *Parser) parseWhileStatement() ast.ExpressionNode {
 	types := *lexer.TokenTypeList
 
-	// Ожидаем while
 	p.Require(types["WHILE"])
 
-	// Условие
 	condition := p.ParseExpression()
 
-	// Ожидаем {
 	p.Require(types["LBRACE"])
 
-	// Блок команд внутри цикла
 	body := &ast.StatementsNode{}
 	for p.Match(types["RBRACE"]) == nil { // }
 		stmt := p.ParseStatement()
@@ -252,7 +248,6 @@ func (p *Parser) parseWhileStatement() ast.ExpressionNode {
 		p.Require(types["SEMICOLON"])
 	}
 
-	// Создаём и возвращаем узел while
 	return ast.NewWhileNode(condition, body)
 }
 
@@ -261,16 +256,10 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 
 	switch n := node.(type) {
 	case *ast.NumberNode:
-		val, err := strconv.Atoi(n.Number.Text)
-		if err != nil {
-			panic("Невозможно преобразовать int")
-		}
+		val, _ := strconv.Atoi(n.Number.Text)
 		return val
 	case *ast.FloatNode:
-		val, err := strconv.ParseFloat(n.Float.Text, 64)
-		if err != nil {
-			panic("Невозможно преобразовать float")
-		}
+		val, _ := strconv.ParseFloat(n.Float.Text, 64)
 		return val
 	case *ast.StringNode:
 		return n.String.Text
@@ -280,25 +269,7 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 		return p.Scope[n.Variable.Text]
 	case *ast.TypedAssignNode:
 		val := p.Run(n.Value)
-		switch n.Type.Type {
-		case "int":
-			if _, ok := val.(int); !ok {
-				panic(fmt.Sprintf("Ожидался тип int, но получено %T", val))
-			}
-		case "double":
-			if _, ok := val.(float64); !ok {
-				panic(fmt.Sprintf("Ожидался тип double, но получено %T", val))
-			}
-		case "string":
-			if _, ok := val.(string); !ok {
-				panic(fmt.Sprintf("Ожидался тип string, но получено %T", val))
-			}
-		case "boolean":
-			if _, ok := val.(bool); !ok {
-				panic(fmt.Sprintf("Ожидался тип boolean, но получено %T", val))
-			}
 
-		}
 		p.Scope[n.Variable.Text] = val
 		fmt.Printf("Добавлена типизированная переменная %s типа %s со значением %v\n", n.Variable.Text, n.Type.Type, val)
 		return val
@@ -315,10 +286,7 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 		return val
 	case *ast.IfNode:
 		cond := p.Run(n.Condition)
-		condVal, ok := cond.(bool)
-		if !ok {
-			panic("Условие в if должно быть boolean")
-		}
+		condVal, _ := cond.(bool)
 		if condVal {
 			return p.Run(n.TrueBranch)
 		}
@@ -328,17 +296,12 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 		return nil
 	case *ast.WhileNode:
 		cond := p.Run(n.Condition)
-		condVal, ok := cond.(bool)
-		if !ok {
-			panic("Условие в while должно быть boolean")
-		}
+		condVal, _ := cond.(bool)
+
 		for condVal {
 			p.Run(n.Body)
 			cond = p.Run(n.Condition)
-			condVal, ok = cond.(bool)
-			if !ok {
-				panic("Условие в while должно быть boolean")
-			}
+			condVal, _ = cond.(bool)
 		}
 		return nil
 
@@ -348,10 +311,7 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 
 		switch l := left.(type) {
 		case int:
-			r, ok := right.(int)
-			if !ok {
-				panic(fmt.Sprintf("Ожидался int справа, но получено %T", right))
-			}
+			r, _ := right.(int)
 			switch n.Operator.TypeToken {
 			case types["PLUS"]:
 				return l + r
@@ -365,13 +325,13 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 				return l == r
 			case types["NONEQUAL"]:
 				return l != r
+			case types["MORE"]:
+				return l > r
+			case types["LESS"]:
+				return l < r
 			}
-			panic("Незвестный оператор!")
 		case float64:
-			r, ok := right.(float64)
-			if !ok {
-				panic(fmt.Sprintf("Ожидался float64 справа, но получено %T", right))
-			}
+			r, _ := right.(float64)
 			switch n.Operator.TypeToken {
 			case types["PLUS"]:
 				return l + r
@@ -382,21 +342,13 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 			case types["DIVIDE"]:
 				return l / r
 			}
-			panic("Незвестный оператор!")
 		case string:
-			r, ok := right.(string)
-			if !ok {
-				panic(fmt.Sprintf("Ожидался string справа, но получено %T", right))
-			}
+			r, _ := right.(string)
 			if n.Operator.TypeToken == types["PLUS"] {
 				return l + r
 			}
-			panic("Операции над строками кроме + не поддерживаются")
 		case bool:
-			r, ok := right.(bool)
-			if !ok {
-				panic(fmt.Sprintf("Ожидался boolean справа, но получено %T", right))
-			}
+			r, _ := right.(bool)
 			switch n.Operator.TypeToken {
 			case types["EQUAL"]:
 				return l == r
@@ -406,8 +358,6 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 				return l && r
 			case types["OR"]:
 				return l || r
-			default:
-				panic("Неподдерживаемая логическая операция")
 			}
 		default:
 			panic("Неподдерживаемые типы в бинарной операции")
@@ -415,4 +365,5 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 	default:
 		panic("Неизвестная нода")
 	}
+	return nil
 }
