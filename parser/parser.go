@@ -56,6 +56,8 @@ func (p *Parser) ParseStatement() ast.ExpressionNode {
 	current := p.Tokens[p.Position]
 
 	switch current.TypeToken.Name {
+	case "func":
+		return p.parseFunctionDeclaration()
 	case "int", "double", "string":
 		stmt := p.parseTypedAssignment()
 		return stmt
@@ -69,6 +71,40 @@ func (p *Parser) ParseStatement() ast.ExpressionNode {
 		expr := p.ParseExpression()
 		return expr
 	}
+}
+
+func (p *Parser) parseFunctionDeclaration() ast.ExpressionNode {
+	types := *lexer.TokenTypeList
+
+	p.Require(types["FUNC"])
+
+	name := p.Require(types["VARIABLE"])
+
+	p.Require(types["LPAREN"])
+
+	var params []*lexer.Token
+	if p.Match(types["RPAREN"]) == nil {
+		for {
+			param := p.Require(types["VARIABLE"])
+			params = append(params, param)
+
+			if p.Match(types["COMMA"]) == nil {
+				break
+			}
+		}
+		p.Require(types["RPAREN"])
+	}
+
+	p.Require(types["LBRACE"])
+
+	body := &ast.StatementsNode{}
+	for p.Match(types["RBRACE"]) == nil {
+		stmt := p.ParseStatement()
+		body.AddNode(stmt)
+		p.Require(types["SEMICOLON"])
+	}
+
+	return ast.NewFunctionDeclarationNode(name, params, body)
 }
 
 func (p *Parser) parseIfStatement() ast.ExpressionNode {
@@ -227,8 +263,24 @@ func (p *Parser) parsePrimary() ast.ExpressionNode {
 		return ast.NewStringNode(*str)
 	}
 	if variable := p.Match(types["VARIABLE"]); variable != nil {
+		// Это может быть либо переменная, либо вызов функции
+		if p.Match(types["LPAREN"]) != nil {
+			var args []ast.ExpressionNode
+			if p.Match(types["RPAREN"]) == nil {
+				for {
+					arg := p.ParseExpression()
+					args = append(args, arg)
+					if p.Match(types["COMMA"]) == nil {
+						break
+					}
+				}
+				p.Require(types["RPAREN"])
+			}
+			return ast.NewFunctionCallNode(variable, args)
+		}
 		return ast.NewVariableNode(*variable)
 	}
+
 	panic("Ожидалось выражение")
 }
 
@@ -362,6 +414,34 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 		default:
 			panic("Неподдерживаемые типы в бинарной операции")
 		}
+	case *ast.FunctionDeclarationNode:
+		p.Scope[n.Name.Text] = n
+		return nil
+
+	case *ast.FunctionCallNode:
+		fn, ok := p.Scope[n.Name.Text].(*ast.FunctionDeclarationNode)
+		if !ok {
+			panic(fmt.Sprintf("Функция %s не найдена", n.Name.Text))
+		}
+
+		// Сохраняем старый скоуп
+		oldScope := p.Scope
+
+		for i, param := range fn.Params {
+			if i < len(n.Arguments) {
+				// Для аргументов вычисляем их значение
+				p.Scope[param.Text] = p.Run(n.Arguments[i])
+			} else {
+				fmt.Println("Значение не найдено!")
+				p.Scope[param.Text] = nil
+			}
+		}
+
+		result := p.Run(fn.Body)
+		p.Scope = oldScope
+
+		return result
+
 	default:
 		panic("Неизвестная нода")
 	}

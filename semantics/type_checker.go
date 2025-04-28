@@ -6,12 +6,21 @@ import (
 	"fmt"
 )
 
+type FunctionSignature struct {
+	Params     []string // типы параметров по порядку
+	ReturnType string
+}
+
 type TypeChecker struct {
-	Scope map[string]string // имя переменной → тип (например: "x" → "int")
+	Scope     map[string]string // имя переменной → тип (например: "x" → "int")
+	Functions map[string]FunctionSignature
 }
 
 func NewTypeChecker() *TypeChecker {
-	return &TypeChecker{Scope: map[string]string{}}
+	return &TypeChecker{
+		Scope:     map[string]string{},
+		Functions: map[string]FunctionSignature{},
+	}
 }
 
 func (tc *TypeChecker) Check(node ast.ExpressionNode) (string, error) {
@@ -156,6 +165,65 @@ func (tc *TypeChecker) Check(node ast.ExpressionNode) (string, error) {
 			return "", err
 		}
 		return "void", nil
+
+	case *ast.FunctionDeclarationNode:
+		// Сохраняем сигнатуру функции
+		paramTypes := []string{}
+		for _, param := range n.Params {
+			paramTypes = append(paramTypes, normalizeTypeName(param.TypeToken.Name))
+		}
+
+		// Здесь надо сразу создать сигнатуру, включая тип возврата
+		tc.Functions[n.Name.Text] = FunctionSignature{
+			Params:     paramTypes,
+			ReturnType: "void", // <---- Сейчас у тебя функции всегда "void", потому что не возвращают значение явно
+		}
+
+		// Создаём новый скоуп для проверки тела функции
+		oldScope := tc.Scope
+		tc.Scope = make(map[string]string)
+		for i, param := range n.Params {
+			tc.Scope[param.Text] = paramTypes[i]
+		}
+
+		bodyReturnType, err := tc.Check(n.Body)
+		if err != nil {
+			return "", err
+		}
+
+		// После проверки тела возвращаем старый скоуп
+		tc.Scope = oldScope
+
+		expectedReturnType := tc.Functions[n.Name.Text].ReturnType
+		if expectedReturnType != "void" && bodyReturnType != expectedReturnType {
+			return "", fmt.Errorf("функция %s должна возвращать %s, но возвращает %s", n.Name.Text, expectedReturnType, bodyReturnType)
+		}
+		return "void", nil
+
+	case *ast.FunctionCallNode:
+		signature, ok := tc.Functions[n.Name.Text]
+		if !ok {
+			return "", fmt.Errorf("функция %s не определена", n.Name.Text)
+		}
+		if len(n.Arguments) != len(signature.Params) {
+			return "", fmt.Errorf("функция %s ожидает %d аргументов, получено %d", n.Name.Text, len(signature.Params), len(n.Arguments))
+		}
+		for i, arg := range n.Arguments {
+			argType, err := tc.Check(arg)
+			if err != nil {
+				return "", err
+			}
+			expectedType := signature.Params[i]
+
+			if expectedType == "VARIABLE" {
+				continue
+			}
+
+			if argType != expectedType {
+				return "", fmt.Errorf("в функции %s аргумент %d имеет тип %s, ожидался %s", n.Name.Text, i+1, argType, expectedType)
+			}
+		}
+		return signature.ReturnType, nil
 
 	default:
 		return "", fmt.Errorf("неизвестный тип AST узла: %T", node)

@@ -23,9 +23,11 @@ func main() {
 		}
 		l := lexer.NewLexer(text)
 		l.LexerAnalysis()
+		fmt.Println(l.Tokens)
 		p := parser.NewParser(l.Tokens)
 		p.Scope = scope
 		rootNode := p.ParseCode()
+
 		_, err := checker.Check(rootNode)
 		if err != nil {
 			fmt.Printf("Ошибка семантики: %v\n", err)
@@ -33,7 +35,7 @@ func main() {
 		}
 		p.Run(rootNode)
 		scope = p.Scope
-
+		fmt.Println("scope = ", scope)
 		builder := tac.NewTACBuilder()
 		builder.Generate(rootNode)
 		fmt.Println("=== Трёхадресный код ===")

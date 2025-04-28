@@ -106,6 +106,7 @@ func (b *TACBuilder) Generate(node ast.ExpressionNode) string {
 			Op:  "label",
 			Res: elseLabel,
 		})
+
 		if n.FalseBranch != nil {
 			b.Generate(n.FalseBranch)
 		}
@@ -145,6 +146,45 @@ func (b *TACBuilder) Generate(node ast.ExpressionNode) string {
 		})
 		return ""
 
+	case *ast.FunctionDeclarationNode:
+		b.instructions = append(b.instructions, TACInstruction{
+			Op:  "func",
+			Res: n.Name.Text,
+		})
+
+		b.Generate(n.Body)
+
+		b.instructions = append(b.instructions, TACInstruction{
+			Op:  "endfunc",
+			Res: n.Name.Text,
+		})
+
+		return ""
+
+	case *ast.FunctionCallNode:
+		var argTemps []string
+		for _, arg := range n.Arguments {
+			tempVar := b.Generate(arg)
+			argTemps = append(argTemps, tempVar)
+		}
+
+		resultTemp := b.newTemp()
+		b.instructions = append(b.instructions, TACInstruction{
+			Op:   "call",
+			Arg1: n.Name.Text,
+			Arg2: fmt.Sprintf("%d", len(argTemps)),
+			Res:  resultTemp,
+		})
+
+		for i, arg := range argTemps {
+			b.instructions = append(b.instructions, TACInstruction{
+				Op:   fmt.Sprintf("arg%d", i),
+				Arg1: arg,
+			})
+		}
+
+		return resultTemp
+
 	default:
 		panic(fmt.Sprintf("неподдерживаемый тип узла: %T", node))
 	}
@@ -165,8 +205,18 @@ func (b *TACBuilder) Print() {
 			fmt.Printf("iffalse %s goto %s\n", instr.Arg1, instr.Res)
 		case "label":
 			fmt.Printf("%s:\n", instr.Res)
+		case "func":
+			fmt.Printf("func %s\n", instr.Res)
+		case "endfunc":
+			fmt.Printf("endfunc %s\n", instr.Res)
+		case "call":
+			fmt.Printf("%s = call %s with %s args\n", instr.Res, instr.Arg1, instr.Arg2)
 		default:
-			fmt.Printf("// неизвестная инструкция: %+v\n", instr)
+			if len(instr.Op) > 3 && instr.Op[:3] == "arg" {
+				fmt.Printf("param %s\n", instr.Arg1)
+			} else {
+				fmt.Printf("// неизвестная инструкция: %+v\n", instr)
+			}
 		}
 	}
 }

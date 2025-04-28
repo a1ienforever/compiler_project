@@ -47,6 +47,7 @@ var TokenTypeList = &map[string]TokenType{
 	"LBRACE":   *NewTokenType("LBRACE", "{"),
 	"RBRACE":   *NewTokenType("RBRACE", "}"),
 	// Логические операции
+	"FUNC":     *NewTokenType("func", "func"),
 	"IF":       *NewTokenType("if", "if"),
 	"ELSE":     *NewTokenType("else", "else"),
 	"EQUAL":    *NewTokenType("EQUAL", "equal"),
@@ -59,6 +60,7 @@ var TokenTypeList = &map[string]TokenType{
 
 	"SEMICOLON":  *NewTokenType("SEMICOLON", ";"),
 	"WHITESPACE": *NewTokenType("WHITESPACE", "[ \n\t\r]+"),
+	"COMMA":      *NewTokenType("COMMA", ","),
 }
 
 var TokenTypesOrdered = []TokenType{
@@ -66,6 +68,7 @@ var TokenTypesOrdered = []TokenType{
 	*NewTokenType("if", "if"),
 	*NewTokenType("else", "else"),
 	*NewTokenType("while", "while"),
+	*NewTokenType("func", "func"),
 	//*NewTokenType("VAR", "var"),
 	*NewTokenType("int", "int"),
 	*NewTokenType("double", "double"),
@@ -102,6 +105,7 @@ var TokenTypesOrdered = []TokenType{
 	*NewTokenType("LBRACE", "{"),
 	*NewTokenType("RBRACE", "}"),
 	*NewTokenType("SEMICOLON", ";"),
+	*NewTokenType("COMMA", ","),
 
 	// Пробелы (последним, чтобы можно было игнорировать)
 	*NewTokenType("WHITESPACE", `[ \n\t\r]+`),
