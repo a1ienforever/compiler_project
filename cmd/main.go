@@ -35,10 +35,11 @@ func main() {
 		}
 		p.Run(rootNode)
 		scope = p.Scope
-		fmt.Println("scope = ", scope)
+		//fmt.Println("scope = ", scope)
 		builder := tac.NewTACBuilder()
 		builder.Generate(rootNode)
 		fmt.Println("=== Трёхадресный код ===")
+		builder.Optimize()
 		builder.Print()
 	}
 }

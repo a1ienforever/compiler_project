@@ -3,6 +3,8 @@ package tac
 import (
 	"compiler_project/parser/ast" // замени на реальный путь к твоему ast пакету
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 type TACInstruction struct {
@@ -60,6 +62,14 @@ func (b *TACBuilder) Generate(node ast.ExpressionNode) string {
 		return n.Variable.Text
 
 	case *ast.BinOperationNode:
+		leftConst, leftIsConst := extractConstant(n.LeftNode)
+		rightConst, rightIsConst := extractConstant(n.RightNode)
+
+		if leftIsConst && rightIsConst {
+			result := evalConstantBinary(n.Operator.Text, leftConst, rightConst)
+			return result
+		}
+
 		left := b.Generate(n.LeftNode)
 		right := b.Generate(n.RightNode)
 		temp := b.newTemp()
@@ -219,4 +229,82 @@ func (b *TACBuilder) Print() {
 			}
 		}
 	}
+}
+
+func (b *TACBuilder) Optimize() {
+	var optimized []TACInstruction
+	used := make(map[string]bool)
+
+	// Проход 1: Определим, какие переменные используются
+	for _, instr := range b.instructions {
+		if instr.Arg1 != "" {
+			used[instr.Arg1] = true
+		}
+		if instr.Arg2 != "" {
+			used[instr.Arg2] = true
+		}
+	}
+
+	// Проход 2: Удалим инструкции, результат которых не используется
+	for _, instr := range b.instructions {
+		isTemp := strings.HasPrefix(instr.Res, "t")
+		if instr.Res != "" &&
+			!used[instr.Res] &&
+			isTemp &&
+			instr.Op != "show" && instr.Op != "call" && instr.Op != "goto" && instr.Op != "iffalse" && instr.Op != "label" && instr.Op != "func" && instr.Op != "endfunc" {
+			continue // Удаляем только временные переменные
+		}
+
+		optimized = append(optimized, instr)
+	}
+
+	b.instructions = optimized
+}
+
+func extractConstant(node ast.ExpressionNode) (string, bool) {
+	switch n := node.(type) {
+	case *ast.NumberNode:
+		return n.Number.Text, true
+	case *ast.FloatNode:
+		return n.Float.Text, true
+	case *ast.BooleanNode:
+		return n.Boolean.Text, true
+	default:
+		return "", false
+	}
+}
+
+func evalConstantBinary(op, a, b string) string {
+	switch op {
+	case "+", "-", "*", "/":
+		// Попробуем как целые
+		ai, err1 := strconv.Atoi(a)
+		bi, err2 := strconv.Atoi(b)
+		if err1 == nil && err2 == nil {
+			switch op {
+			case "+":
+				return strconv.Itoa(ai + bi)
+			case "-":
+				return strconv.Itoa(ai - bi)
+			case "*":
+				return strconv.Itoa(ai * bi)
+			case "/":
+				if bi != 0 {
+					return strconv.Itoa(ai / bi)
+				}
+				return "0" // защита от деления на ноль
+			}
+		}
+	case "equal":
+		if a == b {
+			return "true"
+		}
+		return "false"
+	case "non-equal":
+		if a != b {
+			return "true"
+		}
+		return "false"
+	}
+	return "0"
 }

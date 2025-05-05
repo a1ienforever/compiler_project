@@ -323,7 +323,7 @@ func (p *Parser) Run(node ast.ExpressionNode) interface{} {
 		val := p.Run(n.Value)
 
 		p.Scope[n.Variable.Text] = val
-		fmt.Printf("Добавлена типизированная переменная %s типа %s со значением %v\n", n.Variable.Text, n.Type.Type, val)
+		//fmt.Printf("Добавлена типизированная переменная %s типа %s со значением %v\n", n.Variable.Text, n.Type.Type, val)
 		return val
 	case *ast.StatementsNode:
 		var result interface{}
