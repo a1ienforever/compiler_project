@@ -29,6 +29,10 @@ func (b *TACBuilder) newTemp() string {
 	return fmt.Sprintf("t%d", b.tempCount)
 }
 
+func (b *TACBuilder) Instructions() []TACInstruction {
+	return b.instructions
+}
+
 func (b *TACBuilder) newLabel() string {
 	b.labelCount++
 	return fmt.Sprintf("L%d", b.labelCount)

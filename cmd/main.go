@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"compiler_project/lexer"
+	"compiler_project/llvmgen"
 	"compiler_project/parser"
 	"compiler_project/semantics"
 	"compiler_project/tac"
@@ -11,35 +11,54 @@ import (
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
+	//reader := bufio.NewReader(os.Stdin)
 	scope := map[string]interface{}{}
 	checker := semantics.NewTypeChecker()
 
-	for {
-		fmt.Print(">>> ")
-		text, _ := reader.ReadString('\n')
-		if text == "exit\n" {
-			break
-		}
-		l := lexer.NewLexer(text)
-		l.LexerAnalysis()
-		fmt.Println(l.Tokens)
-		p := parser.NewParser(l.Tokens)
-		p.Scope = scope
-		rootNode := p.ParseCode()
+	//fmt.Print(">>> ")
+	//text, _ := reader.ReadString('\n')
+	text := "int a = 5;\nint b = 10;\nint c = a + b;\nshow c;\n"
+	//if text == "exit\n" {
+	//	return
+	//}
 
-		_, err := checker.Check(rootNode)
-		if err != nil {
-			fmt.Printf("Ошибка семантики: %v\n", err)
-			continue
-		}
-		p.Run(rootNode)
-		scope = p.Scope
-		//fmt.Println("scope = ", scope)
-		builder := tac.NewTACBuilder()
-		builder.Generate(rootNode)
-		fmt.Println("=== Трёхадресный код ===")
-		builder.Optimize()
-		builder.Print()
+	l := lexer.NewLexer(text)
+	l.LexerAnalysis()
+	fmt.Println(l.Tokens)
+
+	p := parser.NewParser(l.Tokens)
+	p.Scope = scope
+	rootNode := p.ParseCode()
+
+	_, err := checker.Check(rootNode)
+	if err != nil {
+		fmt.Printf("Ошибка семантики: %v\n", err)
+		return
 	}
+	p.Run(rootNode)
+	scope = p.Scope
+
+	builder := tac.NewTACBuilder()
+	builder.Generate(rootNode)
+	builder.Optimize()
+
+	fmt.Println("=== Трёхадресный код ===")
+	builder.Print()
+
+	llvm := llvmgen.NewLLVMBuilder()
+	llvm.GenerateFromTAC(builder.Instructions()) // Добавь метод Instructions() в TACBuilder
+	irop := llvm.IR()
+
+	outFile, _ := os.Create("output.ll")
+	defer func(outFile *os.File) {
+		err := outFile.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(outFile)
+	_, err = outFile.WriteString(irop.String())
+	if err != nil {
+		panic(err)
+	}
+
 }
