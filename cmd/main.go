@@ -11,16 +11,10 @@ import (
 )
 
 func main() {
-	//reader := bufio.NewReader(os.Stdin)
 	scope := map[string]interface{}{}
 	checker := semantics.NewTypeChecker()
 
-	//fmt.Print(">>> ")
-	//text, _ := reader.ReadString('\n')
 	text := "int a = 5;\nint b = 10;\nint c = a + b;\nshow c;\n"
-	//if text == "exit\n" {
-	//	return
-	//}
 
 	l := lexer.NewLexer(text)
 	l.LexerAnalysis()
@@ -38,15 +32,14 @@ func main() {
 	p.Run(rootNode)
 	scope = p.Scope
 
+	fmt.Println("=== Трёхадресный код ===")
 	builder := tac.NewTACBuilder()
 	builder.Generate(rootNode)
 	builder.Optimize()
-
-	fmt.Println("=== Трёхадресный код ===")
 	builder.Print()
 
 	llvm := llvmgen.NewLLVMBuilder()
-	llvm.GenerateFromTAC(builder.Instructions()) // Добавь метод Instructions() в TACBuilder
+	llvm.GenerateFromTAC(builder.Instructions())
 	irop := llvm.IR()
 
 	outFile, _ := os.Create("output.ll")
