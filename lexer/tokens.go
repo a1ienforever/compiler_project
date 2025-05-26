@@ -34,7 +34,7 @@ var TokenTypeList = &map[string]TokenType{
 	"VARIABLE": *NewTokenType("VARIABLE", "[a-zA-Z_][a-zA-Z0-9_]*"),
 	"INTEGER":  *NewTokenType("INTEGER", `\d+`),
 	"DOUBLE":   *NewTokenType("DOUBLE", `\d+\.\d+`),
-	"STRING":   *NewTokenType("STRING", `'[^']*'`),
+	"STRING":   *NewTokenType("STRING", "\"[^\"]*\""),
 
 	// Арифметические операции
 	"ASSIGN":   *NewTokenType("ASSIGN", "="),
@@ -89,7 +89,7 @@ var TokenTypesOrdered = []TokenType{
 	// Литералы
 	*NewTokenType("VARIABLE", `[a-zA-Z_][a-zA-Z0-9_]*`), // важно ставить после ключевых слов
 	*NewTokenType("DOUBLE", `\d+\.\d+`),
-	*NewTokenType("STRING", "'[^']*'"),
+	*NewTokenType("STRING", "\"[^\"]*\""),
 	*NewTokenType("INTEGER", `\d+`),
 
 	// Арифметические операторы

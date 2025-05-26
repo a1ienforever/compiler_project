@@ -260,8 +260,15 @@ func (p *Parser) parsePrimary() ast.ExpressionNode {
 		return ast.NewFloatNode(*flt)
 	}
 	if str := p.Match(types["STRING"]); str != nil {
+		// Убираем обрамляющие кавычки (например, "asdf" → asdf)
+		cleaned := str.Text
+		if len(cleaned) >= 2 && cleaned[0] == '"' && cleaned[len(cleaned)-1] == '"' {
+			cleaned = cleaned[1 : len(cleaned)-1]
+		}
+		str.Text = cleaned
 		return ast.NewStringNode(*str)
 	}
+
 	if variable := p.Match(types["VARIABLE"]); variable != nil {
 		// Это может быть либо переменная, либо вызов функции
 		if p.Match(types["LPAREN"]) != nil {

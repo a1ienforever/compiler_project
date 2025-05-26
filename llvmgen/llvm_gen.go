@@ -12,11 +12,14 @@ import (
 )
 
 type LLVMBuilder struct {
-	mod    *ir.Module
-	fnMain *ir.Func
-	block  *ir.Block
-	vars   map[string]*ir.InstAlloca
-	printf *ir.Func
+	mod           *ir.Module
+	fnMain        *ir.Func
+	block         *ir.Block
+	vars          map[string]*ir.InstAlloca
+	printf        *ir.Func
+	namedValues   map[string]value.Value
+	globalStrings map[string]*ir.Global
+	varsTypes     map[string]types.Type
 }
 
 func NewLLVMBuilder() *LLVMBuilder {
@@ -25,10 +28,12 @@ func NewLLVMBuilder() *LLVMBuilder {
 	entry := mainFn.NewBlock("entry")
 
 	return &LLVMBuilder{
-		mod:    mod,
-		fnMain: mainFn,
-		block:  entry,
-		vars:   map[string]*ir.InstAlloca{},
+		mod:           mod,
+		fnMain:        mainFn,
+		block:         entry,
+		vars:          map[string]*ir.InstAlloca{},
+		namedValues:   make(map[string]value.Value),
+		globalStrings: make(map[string]*ir.Global),
 	}
 }
 
@@ -42,6 +47,9 @@ func (b *LLVMBuilder) GenerateFromTAC(instructions []tac.TACInstruction) {
 		case "=":
 			val := b.getValue(instr.Arg1)
 			ptr := b.ensureVar(instr.Res)
+
+			// Если типы не совпадают — возможно, нужно привести val
+			// или просто сделать store с правильным типом
 			b.block.NewStore(val, ptr)
 
 		case "+", "-", "*", "/":
@@ -73,18 +81,35 @@ func (b *LLVMBuilder) GenerateFromTAC(instructions []tac.TACInstruction) {
 			printf := b.ensurePrintf()
 			b.block.NewCall(printf, formatStr, str)
 
-		case "iffalse":
-			cond := b.getValue(instr.Arg1)
-			zero := constant.NewInt(types.I32, 0)
-			condVal := b.block.NewICmp(enum.IPredNE, cond, zero)
+		case "less", "more", "equal":
+			l := b.getValue(instr.Arg1)
+			r := b.getValue(instr.Arg2)
+			var cmp value.Value
+			switch instr.Op {
+			case "less":
+				cmp = b.block.NewICmp(enum.IPredSLT, l, r)
+			case "more":
+				cmp = b.block.NewICmp(enum.IPredSGT, l, r)
+			case "equal":
+				cmp = b.block.NewICmp(enum.IPredEQ, l, r)
+			}
+			b.namedValues[instr.Res] = cmp
 
-			trueBlock := b.fnMain.NewBlock(b.uniqueLabel("true"))
+		case "iffalse":
+			cond := b.getValue(instr.Arg1) // cond — это i1 (например, результат icmp)
+
+			// Блок, если условие ложно (перейти на Res)
 			falseBlock := labelBlocks[instr.Res]
 			if falseBlock == nil {
 				falseBlock = b.fnMain.NewBlock(instr.Res)
 				labelBlocks[instr.Res] = falseBlock
 			}
-			b.block.NewCondBr(condVal, trueBlock, falseBlock)
+
+			// Продолжение, если условие истинно (continue блок)
+			trueBlock := b.fnMain.NewBlock(b.uniqueLabel("continue"))
+			b.block.NewCondBr(cond, trueBlock, falseBlock)
+
+			// Продолжаем генерацию в trueBlock
 			b.block = trueBlock
 
 		case "goto":
@@ -93,13 +118,24 @@ func (b *LLVMBuilder) GenerateFromTAC(instructions []tac.TACInstruction) {
 				targetBlock = b.fnMain.NewBlock(instr.Res)
 				labelBlocks[instr.Res] = targetBlock
 			}
-			b.block.NewBr(targetBlock)
+			// Завершаем текущий блок переходом, если нет терминатора
+			lastInsts := b.block.Insts
+			if len(lastInsts) == 0 || (!isTerminator(lastInsts[len(lastInsts)-1])) {
+				b.block.NewBr(targetBlock)
+			}
+			// Переключаемся на целевой блок
+			b.block = targetBlock
 
 		case "label":
 			block := labelBlocks[instr.Res]
 			if block == nil {
 				block = b.fnMain.NewBlock(instr.Res)
 				labelBlocks[instr.Res] = block
+			}
+			// Если текущий блок не закончен, завершаем его переходом на этот
+			lastInsts := b.block.Insts
+			if len(lastInsts) > 0 && !isTerminator(lastInsts[len(lastInsts)-1]) {
+				b.block.NewBr(block)
 			}
 			b.block = block
 
@@ -115,9 +151,54 @@ func (b *LLVMBuilder) GenerateFromTAC(instructions []tac.TACInstruction) {
 			result := b.block.NewCall(fn, args...)
 			ptr := b.ensureVar(instr.Res)
 			b.block.NewStore(result, ptr)
+
+		case "while_start":
+			// Метка начала цикла
+			startBlock := b.fnMain.NewBlock(instr.Res + "_start")
+			endBlock := b.fnMain.NewBlock(instr.Res + "_end")
+			labelBlocks[instr.Res+"_start"] = startBlock
+			labelBlocks[instr.Res+"_end"] = endBlock
+
+			// Переход из текущего блока в начало цикла
+			if len(b.block.Insts) == 0 || !isTerminator(b.block.Insts[len(b.block.Insts)-1]) {
+				b.block.NewBr(startBlock)
+			}
+			b.block = startBlock
+
+		case "while_cond":
+			// Проверяем условие цикла, ожидается, что Arg1 - условие, Res - имя while_start блока
+			cond := b.getValue(instr.Arg1)
+			zero := constant.NewInt(types.I32, 0)
+			condVal := b.block.NewICmp(enum.IPredNE, cond, zero)
+
+			bodyBlock := b.fnMain.NewBlock(instr.Res + "_body")
+			endBlock := labelBlocks[instr.Res+"_end"]
+			if endBlock == nil {
+				endBlock = b.fnMain.NewBlock(instr.Res + "_end")
+				labelBlocks[instr.Res+"_end"] = endBlock
+			}
+			labelBlocks[instr.Res+"_body"] = bodyBlock
+
+			b.block.NewCondBr(condVal, bodyBlock, endBlock)
+
+			b.block = bodyBlock
+
+		case "while_end":
+			// После тела цикла — переход к началу для проверки условия
+			startBlock := labelBlocks[instr.Res+"_start"]
+			endBlock := labelBlocks[instr.Res+"_end"]
+			if startBlock == nil || endBlock == nil {
+				panic("не найдены блоки while для " + instr.Res)
+			}
+
+			if len(b.block.Insts) == 0 || !isTerminator(b.block.Insts[len(b.block.Insts)-1]) {
+				b.block.NewBr(startBlock)
+			}
+			b.block = endBlock
 		}
 	}
 
+	// В конце ставим вызов system("pause") и ret
 	pauseStr := b.ensurePauseString()
 	pausePtr := b.block.NewGetElementPtr(
 		pauseStr.ContentType,
@@ -129,26 +210,70 @@ func (b *LLVMBuilder) GenerateFromTAC(instructions []tac.TACInstruction) {
 	systemFn := b.ensureSystemFunc()
 	b.block.NewCall(systemFn, pausePtr)
 
-	b.block.NewRet(constant.NewInt(types.I32, 0))
+	// Завершаем последний блок
+	if len(b.block.Insts) == 0 || !isTerminator(b.block.Insts[len(b.block.Insts)-1]) {
+		b.block.NewRet(constant.NewInt(types.I32, 0))
+	}
 }
 
-func (b *LLVMBuilder) ensureVar(name string) *ir.InstAlloca {
-	if v, ok := b.vars[name]; ok {
-		return v
+// Вспомогательная функция для проверки терминатора
+func isTerminator(inst ir.Instruction) bool {
+	_, ok := inst.(ir.Terminator)
+	return ok
+}
+
+func (b *LLVMBuilder) ensureVar(name string) value.Value {
+	if ptr, ok := b.vars[name]; ok {
+		return ptr
 	}
-	ptr := b.block.NewAlloca(types.I32)
+
+	var varType types.Type = types.I32 // по умолчанию int
+
+	if t, ok := b.varsTypes[name]; ok {
+		varType = t
+	}
+
+	ptr := b.block.NewAlloca(varType)
 	b.vars[name] = ptr
 	return ptr
 }
 
 func (b *LLVMBuilder) getValue(name string) value.Value {
-	if v, ok := b.vars[name]; ok {
-		return b.block.NewLoad(types.I32, v)
+	// Временные значения
+	if val, ok := b.namedValues[name]; ok {
+		return val
 	}
-	// Попробуем парсить как число
-	if i, err := strconv.Atoi(name); err == nil {
-		return constant.NewInt(types.I32, int64(i))
+
+	// Булевы литералы
+	if name == "true" {
+		return constant.NewInt(types.I1, 1)
 	}
+	if name == "false" {
+		return constant.NewInt(types.I1, 0)
+	}
+
+	// Целые числа
+	if intVal, err := strconv.Atoi(name); err == nil {
+		return constant.NewInt(types.I32, int64(intVal))
+	}
+
+	// Переменные
+	if ptr, ok := b.vars[name]; ok {
+		elemType := ptr.Type().(*types.PointerType).ElemType
+
+		switch elemType {
+		case types.I1:
+			return b.block.NewLoad(types.I1, ptr)
+		case types.I32:
+			return b.block.NewLoad(types.I32, ptr)
+		case types.I8Ptr: // i8* — указатель на строку
+			// Для строки просто загрузим указатель i8*
+			return b.block.NewLoad(types.I8Ptr, ptr)
+		default:
+			panic("неподдерживаемый тип переменной: " + name)
+		}
+	}
+
 	panic("неизвестное значение: " + name)
 }
 
@@ -156,10 +281,13 @@ func (b *LLVMBuilder) IR() *ir.Module {
 	return b.mod
 }
 
-func (b *LLVMBuilder) ensureGlobalString(s, name string) value.Value {
-	g := b.mod.NewGlobalDef(name, constant.NewCharArrayFromString(s+"\x00"))
-	g.Linkage = enum.LinkagePrivate
-	return b.block.NewGetElementPtr(g.ContentType, g, constant.NewInt(types.I32, 0), constant.NewInt(types.I32, 0))
+func (b *LLVMBuilder) ensureGlobalString(str, name string) *ir.Global {
+	if g, ok := b.globalStrings[name]; ok {
+		return g
+	}
+	global := b.mod.NewGlobalDef(name, constant.NewCharArrayFromString(str))
+	b.globalStrings[name] = global
+	return global
 }
 
 func (b *LLVMBuilder) ensurePrintf() *ir.Func {
