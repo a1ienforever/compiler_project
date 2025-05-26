@@ -14,16 +14,11 @@ func main() {
 	scope := map[string]interface{}{}
 	checker := semantics.NewTypeChecker()
 
-	text := `int a=10;  
-int b=10;       
-int minus = a - b;       
-int plus = a+b;       
-int mlt = a*b;       
-int div = a / b;       
-show minus;       
-show plus;       
-show mlt;       
-show div;`
+	text := `int a=1;
+while a less 10{
+	show a;
+	int a = a + 1;
+	};`
 
 	l := lexer.NewLexer(text)
 	l.LexerAnalysis()
